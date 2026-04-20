@@ -1,0 +1,26 @@
+"use client";
+
+import { type ReactNode } from "react";
+import { ThemeProvider } from "next-themes";
+import { Toaster } from "@/components/ui/sonner";
+import { AppPreferencesProvider } from "./app-preferences-provider";
+
+export function AppProviders({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  return (
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="light"
+      enableSystem={false}
+      disableTransitionOnChange
+    >
+      <AppPreferencesProvider>
+        {children}
+        <Toaster position="top-right" richColors closeButton />
+      </AppPreferencesProvider>
+    </ThemeProvider>
+  );
+}

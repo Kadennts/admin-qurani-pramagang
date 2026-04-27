@@ -26,6 +26,7 @@ import {
 import { createClient } from "@/utils/supabase/client";
 
 type PayoutRecord = {
+  dbId: string | null;
   guruId: string;
   guruName: string;
   guruEmail: string;
@@ -39,6 +40,8 @@ type PayoutRecord = {
   orderIds: string[];
   lastTransferAt: string | null;
   transferredTotal: number;
+  status: string;
+  catatan: string;
 };
 
 export default function MasterPayoutPage() {
@@ -71,46 +74,62 @@ export default function MasterPayoutPage() {
       const settledOrders = orders.filter(isSettledOrder);
       const coveredOrderIds = getCoveredOrderIds(transfers);
 
-      const nextRecords = gurus
+      let newProcessedTotal = 0;
+      const nextRecords: PayoutRecord[] = [];
+
+      // 1. Push DB Transfers
+      for (const t of transfers) {
+        let statusStr = t.status || "Menunggu";
+        let notes = "";
+        if (statusStr.startsWith("Ditolak|")) {
+           notes = statusStr.substring(8);
+           statusStr = "Ditolak";
+        } else if (statusStr === "Pending") {
+           statusStr = "Menunggu";
+        }
+
+        if (statusStr === "Sudah Dicairkan") {
+           newProcessedTotal += (t.net_amount || 0);
+        }
+
+        nextRecords.push({
+          dbId: t.id,
+          guruId: t.guru_id!,
+          guruName: t.guru_name,
+          guruEmail: t.guru_email!,
+          guruAvatar: (() => { const idx = gurus.findIndex(g => g.id === t.guru_id); return `/img/profil${idx >= 0 ? idx + 1 : 1}.jpg`; })(),
+          bankName: t.bank_name || "",
+          orderCount: t.order_count || 0,
+          grossAmount: t.gross_amount || 0,
+          platformFeeAmount: t.platform_fee_amount || 0,
+          taxAmount: t.tax_amount || 0,
+          netAmount: t.net_amount || 0,
+          orderIds: t.covered_order_ids || [],
+          lastTransferAt: t.created_at,
+          transferredTotal: 0,
+          status: statusStr,
+          catatan: notes
+        });
+      }
+
+      // 2. Drafts (new orders)
+      const draftRecords = gurus
         .map((guru, index) => {
           const availableOrders = settledOrders.filter(
             (order) => order.guru_name === guru.name && !coveredOrderIds.has(order.id)
           );
-          const relatedTransfers = transfers.filter(
-            (transfer) => transfer.guru_id === guru.id || transfer.guru_name === guru.name
-          );
 
-          const grossAmount = availableOrders.reduce(
-            (total, order) => total + calculateFinancials(order.price).gross,
-            0
-          );
-          const platformFeeAmount = availableOrders.reduce(
-            (total, order) => total + calculateFinancials(order.price).platformFee,
-            0
-          );
-          const taxAmount = availableOrders.reduce(
-            (total, order) => total + calculateFinancials(order.price).taxFee,
-            0
-          );
-          const netAmount = availableOrders.reduce(
-            (total, order) => total + calculateFinancials(order.price).net,
-            0
-          );
-          const transferredTotal = relatedTransfers.reduce(
-            (total, transfer) => total + Number(transfer.net_amount ?? 0),
-            0
-          );
-          const lastTransferAt =
-            relatedTransfers[0]?.processed_at ?? relatedTransfers[0]?.created_at ?? null;
+          const grossAmount = availableOrders.reduce((total, order) => total + calculateFinancials(order.price).gross, 0);
+          const platformFeeAmount = availableOrders.reduce((total, order) => total + calculateFinancials(order.price).platformFee, 0);
+          const taxAmount = availableOrders.reduce((total, order) => total + calculateFinancials(order.price).taxFee, 0);
+          const netAmount = availableOrders.reduce((total, order) => total + calculateFinancials(order.price).net, 0);
 
           return {
+            dbId: null,
             guruId: guru.id,
             guruName: guru.name,
-            guruEmail:
-              guru.email ??
-              `${guru.name.toLowerCase().replace(/\s+/g, ".")}@qurani.app`,
-            guruAvatar:
-              guru.avatar_url ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${guru.name}`,
+            guruEmail: guru.email ?? `${guru.name.toLowerCase().replace(/\s+/g, ".")}@qurani.app`,
+            guruAvatar: `/img/profil${index + 1}.jpg`,
             bankName: getDeterministicBankName(guru.name, index),
             orderCount: availableOrders.length,
             grossAmount,
@@ -118,16 +137,18 @@ export default function MasterPayoutPage() {
             taxAmount,
             netAmount,
             orderIds: availableOrders.map((order) => order.id),
-            lastTransferAt,
-            transferredTotal,
+            lastTransferAt: null,
+            transferredTotal: 0,
+            status: "Menunggu",
+            catatan: ""
           };
         })
-        .filter((record) => record.orderCount > 0 || record.transferredTotal > 0);
+        .filter((record) => record.orderCount > 0);
 
-      setRecords(nextRecords);
-      setProcessedTransferTotal(
-        transfers.reduce((total, transfer) => total + Number(transfer.net_amount ?? 0), 0)
-      );
+      const unifiedRecords = [...nextRecords, ...draftRecords].sort((a,b) => b.netAmount - a.netAmount);
+
+      setRecords(unifiedRecords);
+      setProcessedTransferTotal(newProcessedTotal);
     } catch (error) {
       console.error("Failed fetching payout data", error);
       setRecords([]);
@@ -156,26 +177,31 @@ export default function MasterPayoutPage() {
     );
   }, [records, searchQuery]);
 
-  const readyToTransferCount = records.filter((record) => record.netAmount > 0).length;
-  const totalOutstandingGross = records.reduce((total, record) => total + record.grossAmount, 0);
-  const totalOutstandingNet = records.reduce((total, record) => total + record.netAmount, 0);
+  const readyToTransferCount = records.filter((r) => r.status === "Menunggu" || r.status === "Disetujui").length;
+  const totalOutstandingGross = records.filter((r) => r.status !== "Sudah Dicairkan").reduce((t, r) => t + r.grossAmount, 0);
+  const totalOutstandingNet = records.filter((r) => r.status !== "Sudah Dicairkan").reduce((t, r) => t + r.netAmount, 0);
 
-  const handleProcessTransfer = async (record: PayoutRecord) => {
-    if (!isTransferTableReady) {
-      toast.error("Tabel payout transfer belum tersedia. Jalankan SQL payout terlebih dahulu.");
-      return;
-    }
+  // Reject Modal State
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectRecord, setRejectRecord] = useState<PayoutRecord | null>(null);
 
-    if (record.orderIds.length === 0 || record.netAmount <= 0) {
-      toast.error("Tidak ada saldo payout baru yang bisa diproses untuk guru ini.");
-      return;
-    }
+  const openRejectModal = (rec: PayoutRecord) => {
+     setRejectRecord(rec);
+     setRejectReason("");
+     setRejectModalOpen(true);
+  };
+
+  const handleAction = async (record: PayoutRecord, newStatus: string) => {
+    if (!isTransferTableReady) return toast.error("Tabel payout master_payout_transfers belum ada.");
+    if (record.orderIds.length === 0 || record.netAmount <= 0) return toast.error("Tidak ada saldo.");
 
     setProcessingGuruId(record.guruId);
 
     try {
-      const { error } = await supabase.from("master_payout_transfers").insert([
-        {
+      if (!record.dbId) {
+        // Insert new
+        await supabase.from("master_payout_transfers").insert([{
           guru_id: record.guruId,
           guru_name: record.guruName,
           guru_email: record.guruEmail,
@@ -187,22 +213,35 @@ export default function MasterPayoutPage() {
           net_amount: record.netAmount,
           order_count: record.orderCount,
           covered_order_ids: record.orderIds,
-          status: "Pending",
-        },
-      ]);
-
-      if (error) {
-        throw error;
+          status: newStatus,
+        }]);
+      } else {
+        // Update existing
+        await supabase.from("master_payout_transfers").update({ status: newStatus }).eq("id", record.dbId);
       }
 
-      toast.success(`Transfer ${record.guruName} berhasil dicatat ke Supabase.`);
+      toast.success(`Berhasil! Status diubah menjadi ${newStatus.split('|')[0]}`);
       await fetchData();
     } catch (error) {
-      console.error("Failed processing payout transfer", error);
-      toast.error("Gagal menyimpan proses transfer payout.");
+      console.error(error);
+      toast.error("Gagal melakukan proses tersebut.");
     } finally {
       setProcessingGuruId(null);
     }
+  };
+
+  const handleRejectSubmit = async () => {
+    if(!rejectRecord) return;
+    if(!rejectReason.trim()) return toast.error("Masukkan alasan penolakan");
+    await handleAction(rejectRecord, `Ditolak|${rejectReason}`);
+    setRejectModalOpen(false);
+  };
+
+  const renderStatusBadge = (status: string) => {
+     if (status === "Menunggu") return <span className="inline-flex gap-1 items-center px-3 py-1 rounded-full border border-yellow-200 bg-yellow-50 text-[10px] text-yellow-600 font-bold"><div className="w-1.5 h-1.5 rounded-full bg-yellow-500"></div> Menunggu</span>;
+     if (status === "Disetujui") return <span className="inline-flex gap-1 items-center px-3 py-1 rounded-full border border-emerald-200 bg-emerald-50 text-[10px] text-emerald-600 font-bold"><div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div> Disetujui</span>;
+     if (status === "Ditolak") return <span className="inline-flex gap-1 items-center px-3 py-1 rounded-full border border-red-200 bg-red-50 text-[10px] text-red-600 font-bold"><div className="w-1.5 h-1.5 rounded-full bg-red-500"></div> Ditolak</span>;
+     return <span className="inline-flex gap-1 items-center px-3 py-1 rounded-full border border-blue-200 bg-blue-50 text-[10px] text-blue-600 font-bold"><div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div> Selesai</span>;
   };
 
   return (
@@ -302,6 +341,7 @@ export default function MasterPayoutPage() {
                 <th className="px-6 py-4">PPh 2.5%</th>
                 <th className="px-6 py-4">Net</th>
                 <th className="px-6 py-4">Transfer Terakhir</th>
+                <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4">Aksi</th>
               </tr>
             </thead>
@@ -319,8 +359,8 @@ export default function MasterPayoutPage() {
                   </td>
                 </tr>
               ) : (
-                filteredRecords.map((record) => (
-                  <tr key={record.guruId} className="hover:bg-slate-50/80 transition-colors">
+                filteredRecords.map((record, index) => (
+                  <tr key={record.dbId ?? `draft-${record.guruId}-${index}`} className="hover:bg-slate-50/80 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-4">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -359,21 +399,36 @@ export default function MasterPayoutPage() {
                       {record.lastTransferAt ? formatDateTime(record.lastTransferAt) : "Belum ada"}
                     </td>
                     <td className="px-6 py-4">
-                      {record.netAmount > 0 ? (
-                        <button
-                          type="button"
-                          onClick={() => void handleProcessTransfer(record)}
-                          disabled={processingGuruId === record.guruId}
-                          className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-4 py-2 text-xs font-black text-blue-600 transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          <Send size={14} />
-                          {processingGuruId === record.guruId ? "Memproses..." : "Proses Transfer"}
-                        </button>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-[11px] font-black text-[#059669]">
-                          <CheckCircle2 size={13} />
-                          Sudah Dicairkan
-                        </span>
+                       {renderStatusBadge(record.status)}
+                    </td>
+                    <td className="px-6 py-4">
+                      {record.status === 'Menunggu' && (
+                         <div className="flex items-center gap-2">
+                           <button onClick={() => void handleAction(record, "Disetujui")} className="inline-flex items-center gap-1 px-3 py-1.5 border border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-full text-[10px] font-bold">
+                              <CheckCircle2 size={12}/> Setujui
+                           </button>
+                           <button onClick={() => openRejectModal(record)} className="inline-flex items-center gap-1 px-3 py-1.5 border border-rose-200 bg-rose-50 text-rose-500 hover:bg-rose-100 rounded-full text-[10px] font-bold">
+                              Tolak
+                           </button>
+                         </div>
+                      )}
+                      {record.status === 'Disetujui' && (
+                         <button onClick={() => void handleAction(record, "Sudah Dicairkan")} disabled={processingGuruId === record.guruId} className="inline-flex items-center gap-1.5 px-4 py-2 border border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100 transition disabled:opacity-50 rounded-full text-[10px] font-bold">
+                           <Send size={12}/> Proses Transfer
+                         </button>
+                      )}
+                      {record.status === 'Ditolak' && (
+                         <div className="flex items-center gap-2">
+                           <button onClick={() => void handleAction(record, "Menunggu")} className="inline-flex items-center gap-1 px-3 py-1.5 border border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100 rounded-full text-[10px] font-bold">
+                              <RefreshCcw size={12}/> Reset
+                           </button>
+                           <span className="text-[10px] text-slate-400 italic max-w-[150px] truncate">{record.catatan}</span>
+                         </div>
+                      )}
+                      {record.status === 'Sudah Dicairkan' && (
+                         <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-[11px] font-black text-[#059669]">
+                          <CheckCircle2 size={13} /> Selesai
+                         </span>
                       )}
                     </td>
                   </tr>
@@ -388,11 +443,38 @@ export default function MasterPayoutPage() {
             Menampilkan <span className="font-bold text-[#059669]">{filteredRecords.length}</span>{" "}
             data payout.
           </p>
-          <p className="text-sm font-semibold text-slate-400">
-            Transfer yang diproses di sini akan langsung masuk ke halaman Wallet.
-          </p>
         </div>
       </div>
+
+      {rejectModalOpen && (
+         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 border border-slate-100">
+               <h3 className="font-black text-slate-800 text-lg">Tolak Payout</h3>
+               <p className="text-sm text-slate-500 mb-4">Guru: <span className="font-bold text-slate-800">{rejectRecord?.guruName}</span></p>
+               
+               <div className="mb-6">
+                  <label className="text-xs font-bold text-slate-600 mb-1.5 block">Alasan Penolakan *</label>
+                  <textarea 
+                     rows={3}
+                     className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:border-emerald-500"
+                     placeholder="Contoh: Verifikasi rekening gagal, dokumen tidak lengkap..."
+                     value={rejectReason}
+                     onChange={(e) => setRejectReason(e.target.value)}
+                  ></textarea>
+               </div>
+               
+               <div className="flex gap-2 justify-end">
+                  <button onClick={() => setRejectModalOpen(false)} className="px-5 py-2 text-sm font-bold text-slate-500 hover:text-slate-800">
+                     Batal
+                  </button>
+                  <button onClick={handleRejectSubmit} className="bg-rose-400 hover:bg-rose-500 text-white px-5 py-2 rounded-xl text-sm font-bold shadow-sm">
+                     Tolak Payout
+                  </button>
+               </div>
+            </div>
+         </div>
+      )}
+
     </div>
   );
 }

@@ -32,6 +32,17 @@ export default function MasterPaketPage() {
 
    const supabase = createClient();
 
+   // Fixed name-based avatar mapping: Hasyim=profil1, Indi=profil2, Nanda=profil3
+   const getGuruAvatar = (name: string, _guruList?: any[]) => {
+      const n = name.toLowerCase();
+      if (n.includes('hasyim')) return '/img/profil1.jpg';
+      if (n.includes('indi')) return '/img/profil2.jpg';
+      if (n.includes('nanda')) return '/img/profil3.jpg';
+      // fallback: use avatar_url from DB if provided
+      const fromDb = _guruList?.find(g => g.name === name)?.avatar_url;
+      return fromDb || '/img/profil1.jpg';
+   };
+
    useEffect(() => {
       fetchData();
    }, []);
@@ -72,7 +83,7 @@ export default function MasterPaketPage() {
                id: `${guru.id}-${idx}`,
                guru_id: guru.id,
                guru_name: guru.name,
-               guru_avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${guru.name}`,
+               guru_avatar: getGuruAvatar(guru.name, loadedGurus),
                name: p.name,
                desc: p.desc,
                sessions: p.sessions,
@@ -197,7 +208,7 @@ export default function MasterPaketPage() {
                            activeGuruFilter === g.id ? 'bg-[#059669] text-white border-[#059669] shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                         }`}
                      >
-                        <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${g.name}`} alt="" className="w-6 h-6 rounded-full bg-slate-100 border border-slate-200"/>
+                        <img src={getGuruAvatar(g.name, gurus)} alt="" className="w-6 h-6 rounded-full bg-slate-100 border border-slate-200 object-cover"/>
                         {g.name} <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${activeGuruFilter === g.id ? 'bg-white/20' : 'bg-slate-100 text-slate-500'}`}>{pkgsAmt}</span>
                      </button>
                   );
@@ -211,7 +222,7 @@ export default function MasterPaketPage() {
                <div className="flex flex-col md:flex-row md:items-center gap-8">
                   <div className="flex items-center gap-4 border-b md:border-b-0 md:border-r border-emerald-200/50 pb-6 md:pb-0 md:pr-12">
                      <div className="w-14 h-14 rounded-full bg-white border-2 border-[#059669] p-0.5 overflow-hidden">
-                        <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedGuruObj.name}`} alt="" className="w-full h-full bg-slate-100 rounded-full"/>
+                        <img src={getGuruAvatar(selectedGuruObj.name, gurus)} alt="" className="w-full h-full object-cover rounded-full"/>
                      </div>
                      <div>
                         <h3 className="font-black text-slate-800 text-lg">{selectedGuruObj.name}</h3>

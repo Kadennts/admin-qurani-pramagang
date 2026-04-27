@@ -17,12 +17,29 @@ export default function MasterGuruPage() {
 
   const fetchGuru = async () => {
     setIsLoading(true);
-    const { data, error } = await supabase
+    const { data: gurus } = await supabase
       .from('master_guru')
       .select('*')
       .order('join_date', { ascending: false });
+      
+    const { data: orders } = await supabase.from('billing_pesanan').select('*');
     
-    if (data) setGuruData(data);
+    if (gurus) {
+       const mapped = gurus.map((g) => {
+          const guruOrders = (orders || []).filter(o => o.guru_name === g.name);
+          const uniqueMurids = new Set(guruOrders.map(o => o.member_name));
+          const totalRevenue = guruOrders.reduce((sum, o) => sum + (o.price || 0), 0);
+          const activeOrders = guruOrders.filter(o => o.status === 'Menunggu Guru' || o.status === 'Menunggu Bayar' || o.status === 'Pending').length;
+
+          return {
+             ...g,
+             computed_murid: uniqueMurids.size,
+             computed_revenue: totalRevenue,
+             computed_aktif: activeOrders
+          };
+       });
+       setGuruData(mapped);
+    }
     setIsLoading(false);
   };
 
@@ -108,7 +125,9 @@ export default function MasterGuruPage() {
                  <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col relative">
                     
                     {/* Header Image Cover */}
-                    <div className="h-44 w-full bg-gradient-to-r from-emerald-800 to-[#10b981] relative">
+                    <div className="h-44 w-full relative bg-cover bg-center" style={{ backgroundImage: "url('/img/image1.jpg')" }}>
+                       {/* Overlay gradient untuk readability jika perlu */}
+                       <div className="absolute inset-0 bg-emerald-900/30"></div>
                        {/* Ornamen overlay simpel */}
                        <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/arabesque.png')] bg-repeat"></div>
                     </div>
@@ -388,25 +407,25 @@ export default function MasterGuruPage() {
                     
                  </div>
 
-                 {/* Statistik Pengajar */}
+                  {/* Statistik Pengajar */}
                  <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
                     <h3 className="font-bold text-slate-800 text-sm mb-6">Statistik Pengajar</h3>
                     <div className="space-y-4">
                        <div className="flex justify-between items-center text-sm font-semibold">
                           <span className="text-slate-500">Total Murid</span>
-                          <span className="text-slate-800 font-extrabold">{selectedGuru.murid || 0} murid</span>
+                          <span className="text-slate-800 font-extrabold">{selectedGuru.status === 'Nonaktif' ? '-' : `${selectedGuru.computed_murid} murid`}</span>
                        </div>
                        <div className="flex justify-between items-center text-sm font-semibold">
                           <span className="text-slate-500">Total Pesanan</span>
-                          <span className="text-slate-800 font-extrabold">{selectedGuru.pesanan_aktif || 0} pesanan</span>
+                          <span className="text-slate-800 font-extrabold">{selectedGuru.status === 'Nonaktif' ? '-' : `${selectedGuru.computed_aktif} pesanan`}</span>
                        </div>
                        <div className="flex justify-between items-center text-sm font-semibold">
                           <span className="text-slate-500">Total Revenue</span>
-                          <span className="text-slate-800 font-extrabold">{formatCurrency(selectedGuru.revenue)}</span>
+                          <span className="text-slate-800 font-extrabold">{selectedGuru.status === 'Nonaktif' ? '-' : formatCurrency(selectedGuru.computed_revenue)}</span>
                        </div>
                        <div className="flex justify-between items-center text-sm font-semibold">
                           <span className="text-slate-500">Rating</span>
-                          <span className="text-slate-800 font-extrabold flex items-center gap-1">{selectedGuru.rating || '0.0'} / 5.0 <Star size={12} className="fill-amber-400 text-amber-400"/></span>
+                          <span className="text-slate-800 font-extrabold flex items-center gap-1">{selectedGuru.status === 'Nonaktif' ? '-' : selectedGuru.rating || '0.0'} / 5.0 <Star size={12} className="fill-amber-400 text-amber-400"/></span>
                        </div>
                        <div className="flex justify-between items-center text-sm font-semibold">
                           <span className="text-slate-500">Bergabung</span>
@@ -433,7 +452,6 @@ export default function MasterGuruPage() {
       {/* Header */}
       <div className="mb-6">
          <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight">Manajemen Guru</h1>
-         <p className="text-slate-500 font-medium text-sm mt-1">Verifikasi, nonaktifkan, atau aktifkan kembali akun guru</p>
       </div>
 
       {/* Filter Tabs & Search */}
@@ -522,10 +540,12 @@ export default function MasterGuruPage() {
                            </td>
                            <td className="px-4 py-4">
                               <div className="flex items-center gap-1.5 font-extrabold text-slate-700 text-sm">
-                                 {item.rating ? (
+                                 {item.status === 'Nonaktif' ? (
+                                   <span className="text-slate-300 font-black">—</span>
+                                 ) : item.rating ? (
                                    <><Star size={14} className="fill-amber-400 text-amber-400" /> {item.rating}</>
                                  ) : (
-                                   <><span className="text-slate-300 font-black">—</span></>
+                                   <>0</>
                                  )}
                               </div>
                            </td>
@@ -535,15 +555,17 @@ export default function MasterGuruPage() {
                               </span>
                            </td>
                            <td className="px-4 py-4 text-slate-800 font-bold text-sm tracking-wide">
-                              {item.murid ? `${item.murid} murid` : <span className="text-slate-300">—</span>}
+                              {item.status === 'Nonaktif' ? <span className="text-slate-300 font-black">—</span> : `${item.computed_murid} murid`}
                            </td>
                            <td className="px-4 py-4 text-slate-800 font-bold text-sm tracking-wide">
-                              {formatCurrency(item.revenue)}
+                              {item.status === 'Nonaktif' ? <span className="text-slate-300 font-black">—</span> : formatCurrency(item.computed_revenue)}
                            </td>
                            <td className="px-4 py-4">
-                              {item.pesanan_aktif > 0 ? (
+                              {item.status === 'Nonaktif' ? (
+                                 <span className="text-slate-300 font-black">—</span>
+                              ) : item.computed_aktif > 0 ? (
                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 text-[11px] font-black border border-blue-100">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div> {item.pesanan_aktif} aktif
+                                  <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div> {item.computed_aktif} aktif
                                 </span>
                               ) : (
                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 text-[11px] font-black border border-slate-200">

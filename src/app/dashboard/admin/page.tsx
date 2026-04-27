@@ -13,6 +13,7 @@ export default function AdminDashboardPage() {
   });
 
   const [genderData, setGenderData] = useState({ male: 0, unknown: 0 });
+  const [tooltip, setTooltip] = useState<{ visible: boolean, x: number, y: number, title: string, count: number, color: string } | null>(null);
   
   // Dummy location arrays based on actual total users to show "Unknown" naturally
   const [countriesData, setCountriesData] = useState<any[]>([]);
@@ -28,10 +29,11 @@ export default function AdminDashboardPage() {
       setIsLoading(true);
       // Mengambil data murni dari database Anda
       const { data: users, error } = await supabase.from('user_profiles').select('*');
+      const { data: adminsData } = await supabase.from('admin_users').select('*');
       
       if (!error && users) {
         const total = users.length;
-        const admins = users.filter(u => u.role === 'admin').length;
+        const admins = users.filter(u => u.role?.toLowerCase() === 'admin').length + (adminsData ? adminsData.length : 0);
         // Jika kolom status ada, kita hitung. Jika tak ada, asumsikan semua Active untuk sementara
         const active = users.filter(u => u.status === 'Active').length || total;
         const blocked = users.filter(u => u.status === 'Blocked').length;
@@ -44,28 +46,27 @@ export default function AdminDashboardPage() {
         const unknownGender = total - maleCount;
         setGenderData({ male: maleCount, unknown: unknownGender });
 
-        // Location Mocks berdasarkan total actual users
-        setCountriesData([
-          { name: 'Unknown', count: total },
-          { name: 'Indonesia', count: 0 },
-          { name: 'United Kingdom', count: 0 },
-          { name: 'United States', count: 0 },
-        ].sort((a,b) => b.count - a.count));
+        // Dynamic Location Aggregation
+        const countryTally: Record<string, number> = {};
+        const stateTally: Record<string, number> = {};
+        const cityTally: Record<string, number> = {};
 
-        setStatesData([
-          { name: 'Unknown', count: total },
-          { name: 'Jawa Timur', count: 0 },
-          { name: 'DI Yogyakarta', count: 0 },
-          { name: 'Jawa Tengah', count: 0 },
-          { name: 'Gorontalo', count: 0 },
-        ].sort((a,b) => b.count - a.count));
+        users.forEach(u => {
+           const c = u.country || 'Unknown';
+           const s = u.province || 'Unknown';
+           const ci = u.city || 'Unknown';
+           
+           countryTally[c] = (countryTally[c] || 0) + 1;
+           stateTally[s] = (stateTally[s] || 0) + 1;
+           cityTally[ci] = (cityTally[ci] || 0) + 1;
+        });
 
-        setCitiesData([
-          { name: 'Unknown', count: total },
-          { name: 'Malang', count: 0 },
-          { name: 'Banyuwangi', count: 0 },
-          { name: 'Surakarta', count: 0 },
-        ].sort((a,b) => b.count - a.count));
+        const toArraySorted = (tally: Record<string, number>) => 
+           Object.entries(tally).map(([name, count]) => ({name, count})).sort((a,b) => b.count - a.count);
+
+        setCountriesData(toArraySorted(countryTally).slice(0, 6));
+        setStatesData(toArraySorted(stateTally).slice(0, 6));
+        setCitiesData(toArraySorted(cityTally).slice(0, 6));
       }
       
       setIsLoading(false);
@@ -92,16 +93,21 @@ export default function AdminDashboardPage() {
           <h3 className="text-lg font-bold text-slate-800">{title}</h3>
           <p className="text-sm text-slate-500">{subtitle}</p>
         </div>
-        <div className={`flex-1 pr-2 ${showScroll ? 'overflow-y-auto custom-scrollbar' : ''}`}>
+        <div className="flex-1 pr-2 overflow-y-auto" style={showScroll ? { overflowY: 'auto', scrollbarWidth: 'thin', scrollbarColor: '#cbd5e1 transparent' } as React.CSSProperties : {}}>
           <div className="space-y-4">
             {data.map((item, idx) => (
-              <div key={idx} className="flex items-center gap-4">
+              <div 
+                key={idx} 
+                className="flex items-center gap-4 cursor-pointer"
+                onMouseMove={(e) => setTooltip({ visible: true, x: e.clientX, y: e.clientY, title: item.name, count: item.count, color: '#059669' })}
+                onMouseLeave={() => setTooltip(null)}
+              >
                 <div className="w-24 text-right text-xs font-semibold text-slate-500 truncate shrink-0">
                   {item.name}
                 </div>
                 <div className="flex-1 h-3.5 bg-transparent rounded-full flex items-center">
                   <div 
-                    className="h-full bg-[#059669] rounded-sm transition-all duration-1000 ease-out"
+                    className="group-hover:opacity-80 h-full bg-[#059669] rounded-sm transition-all duration-1000 ease-out"
                     style={{ width: `${(item.count / maxCount) * 100}%`, minWidth: item.count > 0 ? '4px' : '0' }}
                   />
                 </div>
@@ -133,13 +139,6 @@ export default function AdminDashboardPage() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-10">
       
-      {/* CSS Injection via style tag for custom scrollbar (mac-like) in cities chart */}
-      <style dangerouslySetInnerHTML={{__html: `
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 20px; }
-      `}} />
-
       {/* KPI Cards Layer */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         
@@ -205,6 +204,9 @@ export default function AdminDashboardPage() {
                   strokeWidth="8"
                   strokeDasharray={`${unknownPercent} ${100 - unknownPercent}`}
                   strokeDashoffset="25"
+                  className="cursor-pointer hover:opacity-80 transition-opacity"
+                  onMouseMove={(e) => setTooltip({ visible: true, x: e.clientX, y: e.clientY, title: 'Unknown', count: genderData.unknown, color: '#8ca0b1' })}
+                  onMouseLeave={() => setTooltip(null)}
                 />
                 
                 {/* Male Arc (Green) */}
@@ -216,6 +218,9 @@ export default function AdminDashboardPage() {
                     strokeWidth="8"
                     strokeDasharray={`${malePercent} ${100 - malePercent}`}
                     strokeDashoffset="100" 
+                    className="cursor-pointer hover:opacity-80 transition-opacity"
+                    onMouseMove={(e) => setTooltip({ visible: true, x: e.clientX, y: e.clientY, title: 'Male', count: genderData.male, color: '#059669' })}
+                    onMouseLeave={() => setTooltip(null)}
                   />
                 )}
              </svg>
@@ -243,6 +248,23 @@ export default function AdminDashboardPage() {
         <BarChart title="Top Cities" subtitle="Top locations by users" data={citiesData} showScroll={true} />
 
       </div>
+      
+      {/* Global Tooltip */}
+      {tooltip?.visible && (
+        <div 
+          className="fixed z-50 pointer-events-none bg-white border border-slate-200 rounded-lg shadow-xl p-3 text-xs flex gap-3 transition-opacity"
+          style={{ left: tooltip.x + 15, top: tooltip.y + 15 }}
+        >
+          <div className="w-1 rounded-full" style={{ backgroundColor: tooltip.color }} />
+          <div className="flex flex-col min-w-[70px]">
+             <span className="font-bold text-slate-700">{tooltip.title}</span>
+             <div className="flex justify-between items-center gap-6 mt-1.5">
+                <span className="text-slate-500 font-medium">Users</span>
+                <span className="font-extrabold text-slate-800">{tooltip.count}</span>
+             </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -427,12 +427,13 @@ export default function LandingPage() {
 
       {/* ── Hero Section ── */}
       <section className="relative h-screen min-h-[500px] w-full flex items-end md:items-center overflow-hidden">
-        {/* Background video */}
+        {/* Background image */}
         <div className="absolute inset-0 z-0 bg-slate-900">
-          <video autoPlay loop muted playsInline
-            className="absolute inset-0 w-full h-full object-cover opacity-60">
-            <source src="/video/V-utama.mp4" type="video/mp4" />
-          </video>
+          <img
+            src="/img/hero-bg.png"
+            alt="Hero Background"
+            className="absolute inset-0 w-full h-full object-cover opacity-60"
+          />
           <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/30 to-transparent" />
         </div>
         <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-12 pb-20 md:pb-0 md:pt-20">

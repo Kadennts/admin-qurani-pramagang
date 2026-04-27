@@ -4,8 +4,11 @@ import { useState, useEffect } from "react";
 import { Search, Calendar, Trash2, Bell, Zap, MoreHorizontal, CheckCircle2, ChevronRight, XCircle } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function BillingPesananPage() {
+   const router = useRouter();
    const [pesanan, setPesanan] = useState<any[]>([]);
    const [members, setMembers] = useState<any[]>([]);
    const [gurus, setGurus] = useState<any[]>([]);
@@ -110,6 +113,12 @@ export default function BillingPesananPage() {
          ...prev
       ]);
       setModalStep(5); // Success Screen
+
+      // Toast: payment done notification
+      toast.success(`Pembayaran Lunas — Pesanan Baru`, {
+         description: `Pesanan atas nama ${orderDraft.member.name} telah diproses dan masuk ke dalam sistem via ${orderDraft.paymentMethod || 'Transfer'}.`
+      });
+      setNotifications(prev => [{ id: Date.now(), title: "Pembayaran Berhasil", msg: `${orderDraft.member.name} • ${orderDraft.paymentMethod} • Rp ${orderDraft.paket.price?.toLocaleString('id-ID')}` }, ...prev]);
 
       // Database insert
       await supabase.from('billing_pesanan').insert([newOrder]);
@@ -297,7 +306,11 @@ export default function BillingPesananPage() {
                         <tr><td colSpan={8} className="px-8 py-12 text-center text-slate-500 font-medium">Tidak ada pesanan.</td></tr>
                      ) : (
                         filtered.map((item) => (
-                           <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                           <tr 
+                              key={item.id} 
+                              onClick={() => router.push(`/dashboard/billing/pesanan/${item.id}`)}
+                              className="hover:bg-slate-50/80 transition-colors cursor-pointer"
+                           >
                               <td className="px-8 py-5">
                                  <div className="flex items-center gap-3">
                                     <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-extrabold text-xs tracking-wider shadow-sm shrink-0 ${item.member_color || 'bg-slate-400'}`}>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, Filter, Pencil, Trash2, CheckCircle2, DollarSign, Globe, Plus, ToggleRight, ToggleLeft, FileText, ChevronUp, ChevronDown, CheckCircle, XCircle } from "lucide-react";
+import { Search, Filter, Pencil, Trash2, CheckCircle2, DollarSign, Globe, Plus, ToggleRight, ToggleLeft, FileText, ChevronUp, ChevronDown, CheckCircle, XCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 
 export default function TaxRatesPage() {
@@ -12,6 +12,8 @@ export default function TaxRatesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeType, setActiveType] = useState("Semua Tipe");
   const [showInactive, setShowInactive] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -131,6 +133,21 @@ export default function TaxRatesPage() {
         t.country_name.toLowerCase().includes(q)
      );
   }
+
+  // Set page back to 1 on search / filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, activeType, showInactive]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredData.length / PAGE_SIZE));
+  const paginatedData = filteredData.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  const pageNumbers = () => {
+    if (totalPages <= 5) return Array.from({ length: totalPages }, (_, i) => i + 1);
+    if (currentPage <= 3) return [1, 2, 3, 4, 5];
+    if (currentPage >= totalPages - 2) return [totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    return [currentPage - 2, currentPage - 1, currentPage, currentPage + 1, currentPage + 2];
+  };
 
   // Summary Metrics
   const summary = {
@@ -275,10 +292,10 @@ export default function TaxRatesPage() {
                <tbody className="divide-y divide-slate-100">
                   {isLoading ? (
                      <tr><td colSpan={7} className="px-6 py-12 text-center text-slate-500 font-medium">Memuat data Tax Rates...</td></tr>
-                  ) : filteredData.length === 0 ? (
+                  ) : paginatedData.length === 0 ? (
                      <tr><td colSpan={7} className="px-6 py-12 text-center text-slate-500 font-medium">Tidak ada data pajak ditemukan.</td></tr>
                   ) : (
-                     filteredData.map((item) => (
+                     paginatedData.map((item) => (
                         <tr key={item.id} className={`hover:bg-slate-50 transition-colors ${!item.is_active ? 'opacity-60' : ''}`}>
                            <td className="px-6 py-4">
                               <div className="flex flex-col">
@@ -339,15 +356,37 @@ export default function TaxRatesPage() {
          </div>
 
          {/* Pagination Footer */}
-         <div className="bg-slate-50 border-t border-slate-100 p-4 mt-auto flex items-center justify-between">
-            <div className="text-sm font-medium text-slate-500">
-               Menampilkan <span className="font-bold text-[#059669]">1-{filteredData.length}</span> dari {filteredData.length} data
-            </div>
-            <div className="flex items-center gap-2 text-slate-400 font-bold">
-               <button className="w-8 h-8 flex justify-center items-center rounded hover:bg-slate-200 transition-colors">&lt;</button>
-               <button className="w-8 h-8 flex justify-center items-center rounded bg-[#059669] text-white shadow-sm">1</button>
-               <button className="w-8 h-8 flex justify-center items-center rounded hover:bg-slate-200 transition-colors">&gt;</button>
-            </div>
+         <div className="border-t border-slate-100 px-6 py-4 flex items-center justify-between bg-white mt-auto">
+           <span className="text-sm font-bold text-slate-400">
+             Menampilkan <span className="text-emerald-600 font-extrabold">{filteredData.length === 0 ? 0 : Math.min((currentPage - 1) * PAGE_SIZE + 1, filteredData.length)}–{Math.min(currentPage * PAGE_SIZE, filteredData.length)}</span> dari {filteredData.length} data
+           </span>
+           <div className="flex items-center gap-1">
+             <button
+               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+               disabled={currentPage === 1}
+               className="h-9 w-9 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+             >
+               <ChevronLeft size={16} />
+             </button>
+             {pageNumbers().map((n) => (
+               <button
+                 key={n}
+                 onClick={() => setCurrentPage(n)}
+                 className={`h-9 w-9 flex items-center justify-center rounded-lg text-sm font-bold transition-colors ${
+                   n === currentPage ? "bg-[#059669] text-white" : "border border-slate-200 text-slate-600 hover:bg-slate-50"
+                 }`}
+               >
+                 {n}
+               </button>
+             ))}
+             <button
+               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+               disabled={currentPage === totalPages}
+               className="h-9 w-9 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+             >
+               <ChevronRight size={16} />
+             </button>
+           </div>
          </div>
       </div>
 

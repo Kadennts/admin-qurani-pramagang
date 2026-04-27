@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Bell, Search, MoreVertical, X, Trash2, User, XCircle, CheckCircle2 } from "lucide-react";
+import { Bell, Search, MoreVertical, X, Trash2, CheckCircle2, ShoppingBag, ExternalLink } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { toast } from "sonner";
 
@@ -14,6 +14,8 @@ export default function NotificationsPage() {
 
    const menuRef = useRef<HTMLDivElement>(null);
    const supabase = createClient();
+
+   const [processingId, setProcessingId] = useState<string | null>(null);
 
    // Handle click outside for dropdown menu
    useEffect(() => {
@@ -32,71 +34,92 @@ export default function NotificationsPage() {
 
    const fetchNotifications = async () => {
       setIsLoading(true);
-      
-      // Start with some dummy initial notifications matching the image specifically
-      let fetchedNotifs = [
-         {
-            id: 'n1',
-            type: 'pembatalan_disetujui',
-            title: 'Guru Menyetujui Pembatalan — Indi Fitriani',
-            desc: 'Indi Fitriani telah menyetujui pembatalan pesanan Nur Hidayah • 5x Pertemuan • GoPay • Rp 595.000',
-            time: '1 jam yang lalu',
-            iconColor: 'text-blue-500',
-            bgColor: 'bg-blue-50',
-            borderColor: 'border-blue-100',
-            Icon: User,
-            dot: 'bg-blue-400'
-         },
-         {
-            id: 'n2',
-            type: 'pesanan_batal',
-            title: 'Pesanan Dibatalkan — Nur Hidayah',
-            desc: 'Nur Hidayah • 5x Pertemuan • Indi Fitriani • GoPay • Rp 595.000',
-            time: '2 jam yang lalu',
-            iconColor: 'text-rose-500',
-            bgColor: 'bg-rose-50',
-            borderColor: 'border-rose-100',
-            Icon: XCircle,
-            dot: 'bg-rose-400'
-         }
-      ];
 
-      // Fetch live real pesanan from Billing > Pesanan (to link Simulasi result)
       const { data: pesananData } = await supabase.from('billing_pesanan')
          .select('*')
          .order('order_date', { ascending: false })
-         .limit(10); // Max 10 recent orders to act as notif source
-      
-      if (pesananData) {
-         const liveNotifs = pesananData
-            // Only care about newly created Simulation orders (Menunggu Guru) or fully Selesai/Batal
-            .filter(p => p.status === 'Menunggu Guru' || p.status === 'Menunggu Bayar')
-            .map(p => {
-               const timeDiff = Date.now() - new Date(p.order_date).getTime();
-               let timeStr = 'Baru saja';
-               if (timeDiff > 3600000) timeStr = `${Math.floor(timeDiff / 3600000)} jam yang lalu`;
-               else if (timeDiff > 60000) timeStr = `${Math.floor(timeDiff / 60000)} menit yang lalu`;
+         .limit(30);
 
-               return {
+      const notifs: any[] = [];
+
+      if (pesananData) {
+         for (const p of pesananData) {
+            const timeDiff = Date.now() - new Date(p.order_date).getTime();
+            let timeStr = 'Baru saja';
+            if (timeDiff > 86400000) timeStr = `${Math.floor(timeDiff / 86400000)} hari yang lalu`;
+            else if (timeDiff > 3600000) timeStr = `${Math.floor(timeDiff / 3600000)} jam yang lalu`;
+            else if (timeDiff > 60000) timeStr = `${Math.floor(timeDiff / 60000)} menit yang lalu`;
+
+            const st = (p.status || '').toLowerCase();
+
+            if (st === 'menunggu guru' || st === 'menunggu bayar') {
+               notifs.push({
                   id: p.id,
+                  orderId: p.id,
                   type: 'pesanan_baru',
-                  title: `Pesanan Baru — ${p.member_name}`,
-                  desc: `${p.member_name} • ${p.package_name} • ${p.guru_name} • ${p.payment_method} • Rp ${p.price?.toLocaleString('id-ID')}`,
+                  title: 'Pesanan Baru — Menunggu Bayar',
+                  desc: `${p.member_name} • ${p.package_name} • ${p.guru_name}`,
+                  time: timeStr,
+                  iconColor: 'text-amber-500',
+                  bgColor: 'bg-amber-50',
+                  borderColor: 'border-amber-100',
+                  dot: 'bg-amber-400',
+                  memberName: p.member_name,
+                  paymentMethod: p.payment_method,
+                  price: p.price,
+               });
+            } else if (st === 'lunas' || st === 'selesai') {
+               const via = p.payment_method || 'Transfer';
+               notifs.push({
+                  id: `paid-${p.id}`,
+                  orderId: p.id,
+                  type: 'pembayaran_berhasil',
+                  title: 'Pembayaran Berhasil',
+                  desc: `${p.member_name} • ${via} • Rp ${(p.price || 0).toLocaleString('id-ID')}`,
                   time: timeStr,
                   iconColor: 'text-emerald-600',
                   bgColor: 'bg-emerald-50',
                   borderColor: 'border-emerald-100',
-                  Icon: CheckCircle2,
-                  dot: 'bg-emerald-400'
-               };
-            });
-         
-         // Combine them. We'll put live at the top, then static.
-         fetchedNotifs = [...liveNotifs, ...fetchedNotifs];
+                  dot: 'bg-emerald-400',
+               });
+            }
+         }
       }
 
-      setNotifications(fetchedNotifs);
+      setNotifications(notifs);
       setIsLoading(false);
+   };
+
+   const handlePayNow = async (notif: any) => {
+      setProcessingId(notif.orderId);
+      try {
+         await supabase.from('billing_pesanan').update({
+            status: 'Lunas',
+            payment_method: 'Transfer'
+         }).eq('id', notif.orderId);
+
+         toast.success(`Pembayaran Berhasil — ${notif.memberName}`, {
+            description: `Pesanan telah dibayar lunas via Transfer`
+         });
+         await fetchNotifications();
+      } catch {
+         toast.error('Gagal memproses pembayaran.');
+      } finally {
+         setProcessingId(null);
+      }
+   };
+
+   const handleCancelOrder = async (notif: any) => {
+      setProcessingId(notif.orderId);
+      try {
+         await supabase.from('billing_pesanan').update({ status: 'Batal' }).eq('id', notif.orderId);
+         toast.error(`Pesanan ${notif.memberName} telah dibatalkan.`);
+         await fetchNotifications();
+      } catch {
+         toast.error('Gagal membatalkan pesanan.');
+      } finally {
+         setProcessingId(null);
+      }
    };
 
    // Filtering based on search and tab
@@ -203,25 +226,39 @@ export default function NotificationsPage() {
                   </div>
                ) : (
                   filtered.map((notif) => (
-                     <div key={notif.id} className="p-5 border border-slate-100 hover:border-slate-200 rounded-2xl flex flex-col md:flex-row md:items-start justify-between gap-4 transition-all hover:shadow-sm bg-white group cursor-default relative overflow-hidden">
-                        
-                        <div className="flex gap-5">
+                     <div key={notif.id} className="p-5 border border-slate-100 hover:border-slate-200 rounded-2xl transition-all hover:shadow-sm bg-white">
+                        <div className="flex gap-4">
                            {/* Icon Circle */}
-                           <div className={`w-12 h-12 rounded-full border ${notif.borderColor} ${notif.bgColor} ${notif.iconColor} flex items-center justify-center shrink-0`}>
-                              <notif.Icon size={20} className={notif.type === 'pesanan_baru' ? 'fill-current' : ''} />
+                           <div className={`w-12 h-12 rounded-full border ${notif.borderColor} ${notif.bgColor} ${notif.iconColor} flex items-center justify-center shrink-0 mt-0.5`}>
+                              {notif.type === 'pesanan_baru' ? <ShoppingBag size={20} /> : <CheckCircle2 size={20} className="fill-current" />}
                            </div>
                            
                            {/* Content */}
-                           <div className="flex flex-col pt-0.5">
-                              <h4 className="font-extrabold text-slate-800 text-[15px] mb-1">{notif.title}</h4>
-                              <p className="text-sm font-semibold text-slate-500 leading-relaxed max-w-2xl">{notif.desc}</p>
+                           <div className="flex-1">
+                              <div className="flex items-start justify-between gap-2 mb-1">
+                                 <h4 className="font-extrabold text-slate-800 text-[15px]">{notif.title}</h4>
+                                 <span className="text-xs font-bold text-slate-400 whitespace-nowrap shrink-0">{notif.time}</span>
+                              </div>
+                              <p className="text-sm font-semibold text-slate-500 leading-relaxed mb-3">{notif.desc}</p>
+                              {notif.type === 'pesanan_baru' && (
+                                 <div className="flex gap-2">
+                                    <button
+                                       onClick={() => handlePayNow(notif)}
+                                       disabled={processingId === notif.orderId}
+                                       className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-full transition-colors disabled:opacity-50"
+                                    >
+                                       <ExternalLink size={12} /> {processingId === notif.orderId ? 'Memproses...' : 'Lihat & Bayar'}
+                                    </button>
+                                    <button
+                                       onClick={() => handleCancelOrder(notif)}
+                                       disabled={processingId === notif.orderId}
+                                       className="inline-flex items-center gap-1.5 px-4 py-2 bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 text-xs font-bold rounded-full transition-colors"
+                                    >
+                                       Batal
+                                    </button>
+                                 </div>
+                              )}
                            </div>
-                        </div>
-
-                        {/* Right side Metadata */}
-                        <div className="flex items-center md:flex-col md:items-end justify-between md:justify-start gap-2 pl-17 md:pl-0">
-                           <div className={`w-2 h-2 rounded-full ${notif.dot} md:mb-1 opacity-70`}></div>
-                           <span className="text-xs font-bold text-slate-400 whitespace-nowrap">{notif.time}</span>
                         </div>
                      </div>
                   ))

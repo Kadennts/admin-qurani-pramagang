@@ -14,6 +14,7 @@ import {
 import { toast } from "sonner";
 
 import { useAppPreferences } from "@/components/providers/app-preferences-provider";
+import { LanguageSwitcher } from "@/components/ui/language-switcher";
 
 export default function SettingsPage() {
   const DEFAULT_SETTINGS = {
@@ -51,7 +52,6 @@ export default function SettingsPage() {
             <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">
               {t("settings.title")}
             </h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400">{t("settings.subtitle")}</p>
           </div>
         </div>
 
@@ -107,14 +107,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <select
-              value={language}
-              onChange={(event) => setLanguage(event.target.value as "en" | "id")}
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition-colors focus:border-emerald-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:focus:border-emerald-400"
-            >
-              <option value="en">{t("common.english")}</option>
-              <option value="id">{t("common.indonesian")}</option>
-            </select>
+            <LanguageSwitcher value={language} onChange={setLanguage} />
           </div>
         </div>
       </div>

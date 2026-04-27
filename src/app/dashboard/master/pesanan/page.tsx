@@ -29,6 +29,16 @@ export default function MasterPesananPage() {
 
    const supabase = createClient();
 
+   // Fixed name-based avatar mapping: Hasyim=profil1, Indi=profil2, Nanda=profil3
+   const getGuruAvatar = (name: string, _guruList?: any[]) => {
+      const n = name.toLowerCase();
+      if (n.includes('hasyim')) return '/img/profil1.jpg';
+      if (n.includes('indi')) return '/img/profil2.jpg';
+      if (n.includes('nanda')) return '/img/profil3.jpg';
+      const fromDb = _guruList?.find((g: any) => g.name === name)?.avatar_url;
+      return fromDb || '/img/profil1.jpg';
+   };
+
    useEffect(() => {
       fetchData();
    }, [supabase]);
@@ -276,7 +286,7 @@ export default function MasterPesananPage() {
                   <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
                      <div className="flex items-center gap-4 border-b border-slate-100 pb-5 mb-5">
                         <div className="w-14 h-14 rounded-full overflow-hidden border border-slate-200">
-                           <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${order.guru_name}`} alt="guru" className="w-full h-full object-cover"/>
+                           <img src={getGuruAvatar(order.guru_name, gurus)} alt="guru" className="w-full h-full object-cover"/>
                         </div>
                         <div>
                            <h3 className="font-black text-slate-800 text-base">{order.guru_name}</h3>
@@ -583,7 +593,7 @@ export default function MasterPesananPage() {
                                     className={`p-4 rounded-xl border-2 flex items-center justify-between cursor-pointer transition-all ${orderDraft.guru?.id === g.id ? 'border-[#059669] bg-emerald-50/50' : 'border-slate-100'}`}>
                                     <div className="flex items-center gap-4">
                                        <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 border border-slate-200">
-                                          <img src={g.avatar_url} alt="Guru" className="w-full h-full object-cover" />
+                                          <img src={g.avatar_url || getGuruAvatar(g.name, gurus)} alt="Guru" className="w-full h-full object-cover" />
                                        </div>
                                        <div>
                                           <h4 className="font-extrabold text-slate-800 text-sm">{g.name}</h4>

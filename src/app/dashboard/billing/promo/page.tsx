@@ -271,7 +271,7 @@ export default function BillingPromoPage() {
                         <th className="px-6 py-5 text-center">STATUS</th>
                         <th className="px-6 py-5">PENGGUNAAN <span className="text-slate-300">↕</span></th>
                         <th className="px-6 py-5 flex items-center gap-1">BERLAKU <span className="text-slate-300">↕</span></th>
-                        <th className="px-8 py-5 text-right">AKSI</th>
+                        <th className="px-8 py-5 text-center">AKSI</th>
                      </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">

@@ -14,7 +14,6 @@ import {
   Database,
   DollarSign,
   FileText,
-  FolderTree,
   Globe,
   GraduationCap,
   Languages,
@@ -54,13 +53,48 @@ export function Sidebar() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
 
+  // Safe translation: use English on server, real translation after mount
+  const st = isMounted ? t : (_key: any) => {
+    // Return a basic English fallback for SSR to match server output
+    const fallbacks: Record<string, string> = {
+      "sidebar.support": "Support",
+      "sidebar.billing": "Billing",
+      "sidebar.administrator": "Administrator",
+      "sidebar.masterData": "Master Data",
+      "sidebar.dashboard": "Dashboard",
+      "sidebar.supportTickets": "Support Tickets",
+      "sidebar.groups": "Groups",
+      "sidebar.recitation": "Recitation",
+      "sidebar.kycMember": "KYC Member",
+      "sidebar.kycOrganization": "KYC Organization",
+      "sidebar.orders": "Orders",
+      "sidebar.promo": "Promo & Coupon",
+      "sidebar.wallet": "Wallet",
+      "sidebar.users": "Users",
+      "sidebar.countries": "Countries",
+      "sidebar.states": "States",
+      "sidebar.cities": "Cities",
+      "sidebar.currencies": "Currencies",
+      "sidebar.languages": "Languages",
+      "sidebar.taxRates": "Tax Rates",
+      "sidebar.teacher": "Teacher",
+      "sidebar.package": "Package",
+      "sidebar.payout": "Payout",
+      "sidebar.notifications": "Notifications",
+      "sidebar.settings": "Settings",
+      "sidebar.profile": "Profile",
+      "sidebar.logout": "Logout",
+      "sidebar.closeSidebar": "Close sidebar",
+      "sidebar.expandSidebar": "Expand sidebar",
+    };
+    return fallbacks[_key] ?? _key;
+  };
+
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  const avatarSrc =
-    profile.avatar ||
-    `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(profile.name)}`;
+  const avatarSrc = profile.avatar || "/img/profile admin.jpg";
 
   const derivedOpenMenu: MenuKey = pathname.includes("/master")
     ? "master"
@@ -93,39 +127,38 @@ export function Sidebar() {
   ].join(" ");
 
   const supportLinks: NavLink[] = [
-    { href: "/dashboard/support", label: t("sidebar.dashboard"), icon: LayoutGrid },
-    { href: "/dashboard/support/tickets", label: t("sidebar.supportTickets"), icon: FileText },
-    { href: "/dashboard/support/groups", label: t("sidebar.groups"), icon: Users },
-    { href: "/dashboard/support/recitation", label: t("sidebar.recitation"), icon: BookOpen },
-    { href: "/dashboard/support/kyc-member", label: t("sidebar.kycMember"), icon: UserCheck },
-    { href: "/dashboard/support/kyc-organisasi", label: t("sidebar.kycOrganization"), icon: Building },
+    { href: "/dashboard/support", label: st("sidebar.dashboard"), icon: LayoutGrid },
+    { href: "/dashboard/support/tickets", label: st("sidebar.supportTickets"), icon: FileText },
+    { href: "/dashboard/support/groups", label: st("sidebar.groups"), icon: Users },
+    { href: "/dashboard/support/recitation", label: st("sidebar.recitation"), icon: BookOpen },
+    { href: "/dashboard/support/kyc-member", label: st("sidebar.kycMember"), icon: UserCheck },
+    { href: "/dashboard/support/kyc-organisasi", label: st("sidebar.kycOrganization"), icon: Building },
   ];
 
   const billingLinks: NavLink[] = [
-    { href: "/dashboard/billing", label: t("sidebar.dashboard"), icon: LayoutGrid },
-    { href: "/dashboard/billing/pesanan", label: t("sidebar.orders"), icon: DollarSign },
-    { href: "/dashboard/billing/promo", label: t("sidebar.promo"), icon: Tag },
-    { href: "/dashboard/billing/wallet", label: t("sidebar.wallet"), icon: Wallet },
+    { href: "/dashboard/billing", label: st("sidebar.dashboard"), icon: LayoutGrid },
+    { href: "/dashboard/billing/pesanan", label: st("sidebar.orders"), icon: DollarSign },
+    { href: "/dashboard/billing/promo", label: st("sidebar.promo"), icon: Tag },
+    { href: "/dashboard/billing/wallet", label: st("sidebar.wallet"), icon: Wallet },
   ];
 
   const adminLinks: NavLink[] = [
-    { href: "/dashboard/admin", label: t("sidebar.dashboard"), icon: LayoutGrid },
-    { href: "/dashboard/admin/users", label: t("sidebar.users"), icon: Users },
+    { href: "/dashboard/admin", label: st("sidebar.dashboard"), icon: LayoutGrid },
+    { href: "/dashboard/admin/users", label: st("sidebar.users"), icon: Users },
   ];
 
   const masterLinks: NavLink[] = [
-    { href: "/dashboard/master", label: t("sidebar.dashboard"), icon: LayoutGrid },
-    { href: "/dashboard/master/countries", label: t("sidebar.countries"), icon: Globe },
-    { href: "/dashboard/master/states", label: t("sidebar.states"), icon: Map },
-    { href: "/dashboard/master/cities", label: t("sidebar.cities"), icon: MapPin },
-    { href: "/dashboard/master/currencies", label: t("sidebar.currencies"), icon: DollarSign },
-    { href: "/dashboard/master/languages", label: t("sidebar.languages"), icon: Languages },
-    { href: "/dashboard/master/categories", label: t("sidebar.groupCategories"), icon: FolderTree },
-    { href: "/dashboard/master/taxes", label: t("sidebar.taxRates"), icon: Percent },
-    { href: "/dashboard/master/pesanan", label: t("sidebar.orders"), icon: DollarSign },
-    { href: "/dashboard/master/guru", label: t("sidebar.teacher"), icon: GraduationCap },
-    { href: "/dashboard/master/paket", label: t("sidebar.package"), icon: Package },
-    { href: "/dashboard/master/payout", label: t("sidebar.payout"), icon: Banknote },
+    { href: "/dashboard/master", label: st("sidebar.dashboard"), icon: LayoutGrid },
+    { href: "/dashboard/master/countries", label: st("sidebar.countries"), icon: Globe },
+    { href: "/dashboard/master/states", label: st("sidebar.states"), icon: Map },
+    { href: "/dashboard/master/cities", label: st("sidebar.cities"), icon: MapPin },
+    { href: "/dashboard/master/currencies", label: st("sidebar.currencies"), icon: DollarSign },
+    { href: "/dashboard/master/languages", label: st("sidebar.languages"), icon: Languages },
+    { href: "/dashboard/master/taxes", label: st("sidebar.taxRates"), icon: Percent },
+    { href: "/dashboard/master/pesanan", label: st("sidebar.orders"), icon: DollarSign },
+    { href: "/dashboard/master/guru", label: st("sidebar.teacher"), icon: GraduationCap },
+    { href: "/dashboard/master/paket", label: st("sidebar.package"), icon: Package },
+    { href: "/dashboard/master/payout", label: st("sidebar.payout"), icon: Banknote },
   ];
 
   const navGroups: Array<{
@@ -134,10 +167,10 @@ export function Sidebar() {
     label: string;
     links: NavLink[];
   }> = [
-    { id: "support", icon: MessageSquare, label: t("sidebar.support"), links: supportLinks },
-    { id: "billing", icon: CreditCard, label: t("sidebar.billing"), links: billingLinks },
-    { id: "admin", icon: ShieldCheck, label: t("sidebar.administrator"), links: adminLinks },
-    { id: "master", icon: Database, label: t("sidebar.masterData"), links: masterLinks },
+    { id: "support", icon: MessageSquare, label: st("sidebar.support"), links: supportLinks },
+    { id: "billing", icon: CreditCard, label: st("sidebar.billing"), links: billingLinks },
+    { id: "admin", icon: ShieldCheck, label: st("sidebar.administrator"), links: adminLinks },
+    { id: "master", icon: Database, label: st("sidebar.masterData"), links: masterLinks },
   ];
 
   const toggleMenu = (menu: MenuKey) => {
@@ -280,7 +313,7 @@ export function Sidebar() {
         ) : (
           <Link href="/dashboard" className={mainDashboardClass}>
             <LayoutGrid size={18} />
-            <span>{t("sidebar.dashboard")}</span>
+            <span>{st("sidebar.dashboard")}</span>
           </Link>
         )}
 
@@ -298,7 +331,7 @@ export function Sidebar() {
           <div className="mb-2 flex justify-center">
             <Link
               href="/dashboard/notifications"
-              title={t("sidebar.notifications")}
+              title={st("sidebar.notifications")}
               className={[
                 "flex h-10 w-10 items-center justify-center rounded-xl transition-all",
                 pathname.includes("/notifications")
@@ -321,7 +354,7 @@ export function Sidebar() {
           >
             <div className="flex items-center gap-3">
               <Bell size={18} />
-              <span>{t("sidebar.notifications")}</span>
+              <span>{st("sidebar.notifications")}</span>
             </div>
           </Link>
         )}
@@ -330,7 +363,7 @@ export function Sidebar() {
           <div className="mb-2 flex justify-center">
             <Link
               href="/dashboard/settings"
-              title={t("sidebar.settings")}
+              title={st("sidebar.settings")}
               className={[
                 "flex h-10 w-10 items-center justify-center rounded-xl transition-all",
                 pathname.includes("/settings")
@@ -353,7 +386,7 @@ export function Sidebar() {
           >
             <div className="flex items-center gap-3">
               <Settings size={18} />
-              <span>{t("sidebar.settings")}</span>
+              <span>{st("sidebar.settings")}</span>
             </div>
           </Link>
         )}
@@ -378,10 +411,10 @@ export function Sidebar() {
               ? "h-9 w-9 rounded-full text-emerald-600 hover:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-emerald-500/10"
               : "w-full gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800",
           ].join(" ")}
-          title={isCollapsed ? t("sidebar.expandSidebar") : t("sidebar.closeSidebar")}
+          title={isCollapsed ? st("sidebar.expandSidebar") : st("sidebar.closeSidebar")}
         >
           {isCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={16} />}
-          {!isCollapsed ? <span>{t("sidebar.closeSidebar")}</span> : null}
+          {!isCollapsed ? <span>{st("sidebar.closeSidebar")}</span> : null}
         </button>
 
         <div className={`relative ${isCollapsed ? "flex w-full justify-center" : "w-full"}`}>
@@ -393,7 +426,7 @@ export function Sidebar() {
                 className="flex items-center px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-emerald-600 dark:text-slate-200 dark:hover:bg-slate-900 dark:hover:text-emerald-400"
               >
                 <User size={16} className="mr-3" />
-                {t("sidebar.profile")}
+                {st("sidebar.profile")}
               </Link>
               <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
               <button
@@ -402,7 +435,7 @@ export function Sidebar() {
                 className="flex w-full items-center px-4 py-2.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:hover:bg-red-500/10"
               >
                 <ChevronRight size={16} className="mr-3 rotate-180" />
-                {t("sidebar.logout")}
+                {st("sidebar.logout")}
               </button>
             </div>
           ) : null}

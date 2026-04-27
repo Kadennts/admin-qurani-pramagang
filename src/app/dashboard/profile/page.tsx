@@ -22,6 +22,10 @@ import {
   AppProfile,
   useAppPreferences,
 } from "@/components/providers/app-preferences-provider";
+import { createClient } from "@/utils/supabase/client";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { formatTimezoneLabel } from "@/utils/timezone-helper";
+import { LanguageSwitcher } from "@/components/ui/language-switcher";
 
 const recipients = [
   "Admin Dashboard",
@@ -33,16 +37,128 @@ export default function ProfilePage() {
   const { language, profile, setLanguage, t, updateProfile } = useAppPreferences();
   const { resolvedTheme, setTheme } = useTheme();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [supabase] = useState(() => createClient());
   const [isEditing, setIsEditing] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   const [draftProfile, setDraftProfile] = useState<AppProfile>(profile);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // Master data from Supabase
+  const [dbCountries, setDbCountries] = useState<any[]>([]);
+  const [dbStates, setDbStates] = useState<any[]>([]);
+  const [dbCities, setDbCities] = useState<any[]>([]);
+
+  // Cascaded/filtered lists
+  const [filteredStates, setFilteredStates] = useState<any[]>([]);
+  const [filteredCities, setFilteredCities] = useState<any[]>([]);
 
   useEffect(() => {
     setDraftProfile(profile);
   }, [profile]);
 
+  // Load all master data once
+  useEffect(() => {
+    async function loadMasterData() {
+      const [resCountries, resStates, resCities] = await Promise.all([
+        supabase.from('countries').select('*').order('name'),
+        supabase.from('states').select('*').order('name'),
+        supabase.from('cities').select('*').order('name'),
+      ]);
+      if (resCountries.data) setDbCountries(resCountries.data);
+      if (resStates.data) setDbStates(resStates.data);
+      if (resCities.data) setDbCities(resCities.data);
+    }
+    loadMasterData();
+  }, [supabase]);
+
+  // Filter states when country changes
+  useEffect(() => {
+    if (!draftProfile.country || dbCountries.length === 0) {
+      setFilteredStates(dbStates);
+      return;
+    }
+    const countryObj = dbCountries.find((c) => c.name === draftProfile.country);
+    if (countryObj) {
+      const filteredS = dbStates.filter(
+        (s) => s.country_id === countryObj.id
+      );
+      setFilteredStates(filteredS.length > 0 ? filteredS : dbStates.filter(s => s.country_name === draftProfile.country || s.country === draftProfile.country));
+    } else {
+      setFilteredStates(dbStates);
+    }
+  }, [draftProfile.country, dbCountries, dbStates]);
+
+  // Filter cities when state changes
+  useEffect(() => {
+    if (!draftProfile.state || dbStates.length === 0) {
+      setFilteredCities(dbCities);
+      return;
+    }
+    const stateObj = dbStates.find((s) => s.name === draftProfile.state);
+    if (stateObj) {
+      const filtered = dbCities.filter(
+        (c) => c.state_id === stateObj.id
+      );
+      setFilteredCities(filtered.length > 0 ? filtered : dbCities.filter(c => c.state_name === draftProfile.state || c.state === draftProfile.state));
+    } else {
+      setFilteredCities(dbCities);
+    }
+  }, [draftProfile.state, dbStates, dbCities]);
+
+  // Derived options for SearchableSelect
+  const countryOptions = dbCountries.map((c) => ({ value: c.name, label: c.name }));
+  const stateOptions = filteredStates.map((s) => ({ value: s.name, label: s.name }));
+  const cityOptions = filteredCities.map((c) => ({ value: c.name, label: c.name }));
+
+  const handleCountryChange = (val: string) => {
+    setDraftProfile((prev) => ({ ...prev, country: val, state: '', city: '', timezone: '' }));
+  };
+
+  const handleStateChange = (val: string) => {
+    setDraftProfile((prev) => ({ ...prev, state: val, city: '', timezone: '' }));
+  };
+
+  const handleCityChange = (val: string) => {
+    const selectedCity =
+      filteredCities.find((city) => city.name === val) ??
+      dbCities.find((city) => city.name === val);
+
+    setDraftProfile((prev) => ({
+      ...prev,
+      city: val,
+      timezone: selectedCity?.timezone || "",
+    }));
+  };
+
+  useEffect(() => {
+    if (!draftProfile.city) {
+      if (draftProfile.timezone) {
+        setDraftProfile((prev) => ({ ...prev, timezone: "" }));
+      }
+      return;
+    }
+
+    const selectedCity =
+      filteredCities.find((city) => city.name === draftProfile.city) ??
+      dbCities.find((city) => city.name === draftProfile.city);
+
+    const nextTimezone = selectedCity?.timezone || "";
+
+    if (nextTimezone !== draftProfile.timezone) {
+      setDraftProfile((prev) => ({ ...prev, timezone: nextTimezone }));
+    }
+  }, [draftProfile.city, draftProfile.timezone, filteredCities, dbCities]);
+
+  // Use a stable placeholder during SSR to avoid hydration mismatch.
+  // After mounting, switch to the real profile data from localStorage/cookie.
+  const displayProfile = isMounted ? draftProfile : { ...draftProfile, name: "Admin", avatar: "", role: "Admin" };
+
   const avatarSrc =
-    draftProfile.avatar ||
-    `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(draftProfile.name)}`;
+    displayProfile.avatar ||
+    "/img/profile admin.jpg";
 
   const isDarkMode = resolvedTheme === "dark";
 
@@ -96,11 +212,6 @@ export default function ProfilePage() {
             </div>
             <div>
               <h1 className="text-3xl font-bold tracking-tight">{t("profile.title")}</h1>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                {language === "id"
-                  ? "Kelola informasi akun dan preferensi tampilan Anda."
-                  : "Manage your account information and display preferences."}
-              </p>
             </div>
           </div>
 
@@ -146,7 +257,7 @@ export default function ProfilePage() {
           <div className="space-y-4">
             <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5 transition-colors dark:border-slate-800 dark:bg-slate-950">
               <div className="relative mx-auto h-32 w-32 overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                <img src={avatarSrc} alt={draftProfile.name} className="h-full w-full object-cover" />
+                <img src={avatarSrc} alt={displayProfile.name} className="h-full w-full object-cover" suppressHydrationWarning />
                 {isEditing ? (
                   <button
                     type="button"
@@ -188,10 +299,11 @@ export default function ProfilePage() {
                   {t("profile.name")}
                 </span>
                 <input
-                  value={draftProfile.name}
+                  value={displayProfile.name}
                   onChange={handleDraftChange("name")}
                   readOnly={!isEditing}
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition-colors focus:border-emerald-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:border-emerald-400"
+                  suppressHydrationWarning
                 />
               </label>
 
@@ -201,7 +313,7 @@ export default function ProfilePage() {
                 </span>
                 <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 transition-colors dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">
                   <Briefcase size={16} className="text-slate-400 dark:text-slate-500" />
-                  <span>{draftProfile.role}</span>
+                  <span suppressHydrationWarning>{displayProfile.role}</span>
                 </div>
               </label>
             </div>
@@ -213,7 +325,7 @@ export default function ProfilePage() {
                 </span>
                 <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 transition-colors dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">
                   <Mail size={16} className="text-slate-400 dark:text-slate-500" />
-                  <span>{draftProfile.email}</span>
+                  <span suppressHydrationWarning>{displayProfile.email}</span>
                 </div>
               </label>
 
@@ -221,9 +333,72 @@ export default function ProfilePage() {
                 <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
                   Username
                 </span>
-                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 transition-colors dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">
-                  @{draftProfile.username}
+                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 transition-colors dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200" suppressHydrationWarning>
+                  @{displayProfile.username}
                 </div>
+              </label>
+            </div>
+
+            {/* Location & Timezone Fields */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="space-y-2">
+                <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  Country
+                </span>
+                <SearchableSelect
+                  value={draftProfile.country || ''}
+                  options={countryOptions}
+                  placeholder="Pilih Negara"
+                  disabled={!isEditing}
+                  onChange={handleCountryChange}
+                />
+              </label>
+
+              <label className="space-y-2">
+                <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  State / Province
+                </span>
+                <SearchableSelect
+                  value={draftProfile.state || ''}
+                  options={stateOptions}
+                  placeholder={draftProfile.country ? 'Pilih Provinsi' : 'Pilih Negara dahulu'}
+                  disabled={!isEditing || !draftProfile.country}
+                  onChange={handleStateChange}
+                />
+              </label>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="space-y-2">
+                <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  City
+                </span>
+                <SearchableSelect
+                  value={draftProfile.city || ''}
+                  options={cityOptions}
+                  placeholder={draftProfile.state ? 'Pilih Kota' : 'Pilih Provinsi dahulu'}
+                  disabled={!isEditing || !draftProfile.state}
+                  onChange={handleCityChange}
+                />
+              </label>
+
+              <label className="space-y-2">
+                <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  Timezone
+                </span>
+                <input
+                  value={formatTimezoneLabel(draftProfile.timezone) || ''}
+                  readOnly
+                  placeholder={language === 'id' ? "Otomatis terisi berdasarkan kota" : language === 'ar' ? "تملأ تلقائيا بناء على المدينة" : "Automatically filled based on city"}
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500 outline-none transition-colors dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-400 cursor-not-allowed"
+                />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  {language === 'id' 
+                    ? "Zona waktu otomatis terisi berdasarkan pilihan kota Anda." 
+                    : language === 'ar'
+                    ? "يتم ملء المنطقة الزمنية تلقائيًا بناءً على اختيار مدينتك."
+                    : "Timezone is automatically filled based on your city selection."}
+                </p>
               </label>
             </div>
 
@@ -283,19 +458,16 @@ export default function ProfilePage() {
                 <div>
                   <div className="font-semibold text-slate-900 dark:text-white">{t("profile.language")}</div>
                   <div className="text-sm text-slate-500 dark:text-slate-400">
-                    {language === "id" ? t("common.indonesian") : t("common.english")}
+                    {language === "id"
+                      ? t("common.indonesian")
+                      : language === "ar"
+                        ? t("common.arabic")
+                        : t("common.english")}
                   </div>
                 </div>
               </div>
 
-              <select
-                value={language}
-                onChange={(event) => setLanguage(event.target.value as "en" | "id")}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none transition-colors focus:border-emerald-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:focus:border-emerald-400"
-              >
-                <option value="en">{t("common.english")}</option>
-                <option value="id">{t("common.indonesian")}</option>
-              </select>
+              <LanguageSwitcher value={language} onChange={setLanguage} />
             </div>
           </div>
 

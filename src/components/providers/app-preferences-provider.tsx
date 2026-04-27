@@ -10,7 +10,7 @@ import {
   useState,
 } from "react";
 
-export type AppLanguage = "en" | "id";
+export type AppLanguage = "en" | "id" | "ar";
 
 export type AppProfile = {
   name: string;
@@ -19,6 +19,10 @@ export type AppProfile = {
   role: string;
   bio: string;
   avatar: string;
+  country: string;
+  state: string;
+  city: string;
+  timezone: string;
 };
 
 type TranslationKey =
@@ -99,8 +103,26 @@ type TranslationKey =
   | "auth.selectCountry"
   | "auth.selectProvince"
   | "auth.selectCity"
+  | "tickets.all"
+  | "tickets.open"
+  | "tickets.inProgress"
+  | "tickets.answered"
+  | "tickets.onHold"
+  | "tickets.closed"
+  | "tickets.newTicket"
+  | "tickets.bulkActions"
+  | "tickets.update"
+  | "tickets.delete"
+  | "tickets.searchPlaceholder"
+  | "tickets.dateRange"
+  | "tickets.subject"
+  | "tickets.status"
+  | "tickets.priority"
+  | "tickets.department"
+  | "tickets.contact"
   | "common.english"
-  | "common.indonesian";
+  | "common.indonesian"
+  | "common.arabic";
 
 type PreferencesContextValue = {
   language: AppLanguage;
@@ -192,8 +214,26 @@ const translations: Record<AppLanguage, Record<TranslationKey, string>> = {
     "auth.selectCountry": "Select Country",
     "auth.selectProvince": "Select Province",
     "auth.selectCity": "Select City",
+    "tickets.all": "All",
+    "tickets.open": "Open",
+    "tickets.inProgress": "In Progress",
+    "tickets.answered": "Answered",
+    "tickets.onHold": "On Hold",
+    "tickets.closed": "Closed",
+    "tickets.newTicket": "New Ticket",
+    "tickets.bulkActions": "Bulk Actions",
+    "tickets.update": "Update",
+    "tickets.delete": "Delete",
+    "tickets.searchPlaceholder": "Search tickets...",
+    "tickets.dateRange": "Date Range",
+    "tickets.subject": "Subject",
+    "tickets.status": "Status",
+    "tickets.priority": "Priority",
+    "tickets.department": "Department",
+    "tickets.contact": "Contact",
     "common.english": "English",
     "common.indonesian": "Bahasa Indonesia",
+    "common.arabic": "Arabic",
   },
   id: {
     "sidebar.dashboard": "Dashboard",
@@ -203,7 +243,7 @@ const translations: Record<AppLanguage, Record<TranslationKey, string>> = {
     "sidebar.masterData": "Master Data",
     "sidebar.supportTickets": "Tiket Support",
     "sidebar.groups": "Grup",
-    "sidebar.recitation": "Tilawah",
+    "sidebar.recitation": "Setoran",
     "sidebar.kycMember": "KYC Member",
     "sidebar.kycOrganization": "KYC Organisasi",
     "sidebar.orders": "Pesanan",
@@ -242,7 +282,7 @@ const translations: Record<AppLanguage, Record<TranslationKey, string>> = {
     "profile.notificationRecipients": "Penerima Notifikasi",
     "profile.addRecipient": "Tambah Penerima",
     "profile.noRecipients": "Belum ada penerima notifikasi",
-    "profile.noRecipientsDescription": "Tambahkan orang untuk menerima notifikasi tentang tilawah Anda",
+    "profile.noRecipientsDescription": "Tambahkan orang untuk menerima notifikasi tentang setoran Anda",
     "profile.toastSaved": "Profil Berhasil Diubah!",
     "settings.title": "Pengaturan Qurani",
     "settings.subtitle": "Atur pengalaman membaca, tampilan, dan preferensi bahasa Anda.",
@@ -273,8 +313,125 @@ const translations: Record<AppLanguage, Record<TranslationKey, string>> = {
     "auth.selectCountry": "Pilih Negara",
     "auth.selectProvince": "Pilih Provinsi",
     "auth.selectCity": "Pilih Kota",
+    "tickets.all": "Semua",
+    "tickets.open": "Open",
+    "tickets.inProgress": "Sedang Diproses",
+    "tickets.answered": "Dijawab",
+    "tickets.onHold": "Ditunda",
+    "tickets.closed": "Ditutup",
+    "tickets.newTicket": "Tiket Baru",
+    "tickets.bulkActions": "Aksi Massal",
+    "tickets.update": "Perbarui",
+    "tickets.delete": "Hapus",
+    "tickets.searchPlaceholder": "Cari tiket...",
+    "tickets.dateRange": "Rentang Tanggal",
+    "tickets.subject": "Subjek",
+    "tickets.status": "Status",
+    "tickets.priority": "Prioritas",
+    "tickets.department": "Departemen",
+    "tickets.contact": "Kontak",
     "common.english": "English",
     "common.indonesian": "Bahasa Indonesia",
+    "common.arabic": "Bahasa Arab",
+  },
+  ar: {
+    "sidebar.dashboard": "لوحة القيادة",
+    "sidebar.support": "الدعم",
+    "sidebar.billing": "الفواتير",
+    "sidebar.administrator": "المدير",
+    "sidebar.masterData": "البيانات الأساسية",
+    "sidebar.supportTickets": "تذاكر الدعم",
+    "sidebar.groups": "المجموعات",
+    "sidebar.recitation": "التلاوة",
+    "sidebar.kycMember": "عضو KYC",
+    "sidebar.kycOrganization": "منظمة KYC",
+    "sidebar.orders": "الطلبات",
+    "sidebar.promo": "الترويج والكوبونات",
+    "sidebar.wallet": "المحفظة",
+    "sidebar.users": "المستخدمين",
+    "sidebar.countries": "الدول",
+    "sidebar.states": "الولايات/المقاطعات",
+    "sidebar.cities": "المدن",
+    "sidebar.currencies": "العملات",
+    "sidebar.languages": "اللغات",
+    "sidebar.groupCategories": "فئات المجموعات",
+    "sidebar.taxRates": "معدلات الضرائب",
+    "sidebar.teacher": "المعلم",
+    "sidebar.package": "الحزمة",
+    "sidebar.payout": "الدفع",
+    "sidebar.notifications": "الإشعارات",
+    "sidebar.settings": "الإعدادات",
+    "sidebar.profile": "الملف الشخصي",
+    "sidebar.logout": "تسجيل الخروج",
+    "sidebar.closeSidebar": "إغلاق الشريط الجانبي",
+    "sidebar.expandSidebar": "توسيع الشريط الجانبي",
+    "profile.title": "الملف الشخصي",
+    "profile.settingsButton": "إعدادات قرآني",
+    "profile.edit": "تعديل الملف الشخصي",
+    "profile.save": "حفظ",
+    "profile.cancel": "إلغاء",
+    "profile.name": "الاسم",
+    "profile.email": "البريد الإلكتروني",
+    "profile.role": "الدور",
+    "profile.description": "الوصف",
+    "profile.photoHint": "استخدم صورة واضحة حتى يتمكن فريقك من التعرف عليك بسهولة.",
+    "profile.changePhoto": "تغيير الصورة",
+    "profile.theme": "المظهر",
+    "profile.language": "اللغة",
+    "profile.notificationRecipients": "مستلمو الإشعارات",
+    "profile.addRecipient": "إضافة مستلم",
+    "profile.noRecipients": "لم يتم اختيار مستلمي إشعارات",
+    "profile.noRecipientsDescription": "أضف أشخاصًا لتلقي إشعارات حول تلاواتك",
+    "profile.toastSaved": "تم تحديث الملف الشخصي بنجاح!",
+    "settings.title": "إعدادات قرآني",
+    "settings.subtitle": "اضبط تجربة القراءة والمظهر وتفضيلات اللغة.",
+    "settings.appearance": "المظهر",
+    "settings.appearanceDescription": "بدل بين الوضع الفاتح والداكن لرؤية أكثر راحة.",
+    "settings.languagePreference": "اللغة",
+    "settings.languageDescription": "اختر لغتك المفضلة لواجهة لوحة القيادة.",
+    "settings.light": "فاتح",
+    "settings.dark": "داكن",
+    "auth.loginTitle": "تسجيل الدخول إلى حسابك",
+    "auth.loginSubtitle": "سجل الدخول للمتابعة إلى لوحة قيادة قرآني الخاصة بك.",
+    "auth.username": "اسم المستخدم",
+    "auth.password": "كلمة المرور",
+    "auth.forgotPassword": "نسيت كلمة المرور؟",
+    "auth.login": "تسجيل الدخول",
+    "auth.signUp": "تسجيل",
+    "auth.noAccount": "ليس لديك حساب؟",
+    "auth.createAccount": "إنشاء حساب",
+    "auth.registerTitle": "إنشاء حسابك",
+    "auth.registerGoogle": "التسجيل عبر جوجل",
+    "auth.email": "البريد الإلكتروني",
+    "auth.fullName": "الاسم الكامل",
+    "auth.country": "الدولة",
+    "auth.province": "المقاطعة",
+    "auth.city": "المدينة",
+    "auth.processing": "جاري المعالجة...",
+    "auth.alreadyHaveAccount": "لديك حساب بالفعل؟",
+    "auth.selectCountry": "اختر الدولة",
+    "auth.selectProvince": "اختر المقاطعة",
+    "auth.selectCity": "اختر المدينة",
+    "tickets.all": "كل التذاكر",
+    "tickets.open": "مفتوح",
+    "tickets.inProgress": "جارٍ المعالجة",
+    "tickets.answered": "تمت الإجابة",
+    "tickets.onHold": "معلق",
+    "tickets.closed": "مغلق",
+    "tickets.newTicket": "تذكرة جديدة",
+    "tickets.bulkActions": "إجراءات جماعية",
+    "tickets.update": "تحديث",
+    "tickets.delete": "حذف",
+    "tickets.searchPlaceholder": "ابحث في التذاكر...",
+    "tickets.dateRange": "نطاق التاريخ",
+    "tickets.subject": "الموضوع",
+    "tickets.status": "الحالة",
+    "tickets.priority": "الأولوية",
+    "tickets.department": "القسم",
+    "tickets.contact": "جهة الاتصال",
+    "common.english": "الإنجليزية",
+    "common.indonesian": "الإندونيسية",
+    "common.arabic": "العربية",
   },
 };
 
@@ -285,6 +442,10 @@ const defaultProfile: AppProfile = {
   role: "Admin",
   bio: "Admin",
   avatar: "",
+  country: "Indonesia",
+  state: "Jawa Timur",
+  city: "Malang",
+  timezone: "Asia/Jakarta"
 };
 
 const PreferencesContext = createContext<PreferencesContextValue | null>(null);
@@ -308,6 +469,10 @@ function normalizeProfile(value: Partial<AppProfile> | null | undefined): AppPro
     role,
     bio: value?.bio?.trim() || role,
     avatar: value?.avatar?.trim() || "",
+    country: value?.country || defaultProfile.country,
+    state: value?.state || defaultProfile.state,
+    city: value?.city || defaultProfile.city,
+    timezone: value?.timezone || defaultProfile.timezone,
   };
 }
 
@@ -332,7 +497,12 @@ function readUserCookie() {
       username: parsed.username,
       email: parsed.email,
       role: parsed.role,
-      bio: parsed.role,
+      bio: parsed.bio || parsed.role,
+      avatar: parsed.avatar || "",
+      country: parsed.country,
+      state: parsed.state,
+      city: parsed.city,
+      timezone: parsed.timezone,
     });
   } catch {
     return null;
@@ -344,7 +514,11 @@ function getInitialLanguage(): AppLanguage {
     return "en";
   }
 
-  return window.localStorage.getItem(STORAGE_LANGUAGE_KEY) === "id" ? "id" : "en";
+  const saved = window.localStorage.getItem(STORAGE_LANGUAGE_KEY);
+  if (saved === "id" || saved === "ar" || saved === "en") {
+    return saved as AppLanguage;
+  }
+  return "en";
 }
 
 function getInitialProfile(): AppProfile {
@@ -369,16 +543,45 @@ export function AppPreferencesProvider({
 }: {
   children: ReactNode;
 }) {
-  const [language, setLanguageState] = useState<AppLanguage>(getInitialLanguage);
-  const [profile, setProfile] = useState<AppProfile>(getInitialProfile);
+  // Always start with stable SSR defaults — localStorage is client-only.
+  // Real values are applied after mount to prevent hydration mismatch.
+  const [language, setLanguageState] = useState<AppLanguage>("en");
+  const [profile, setProfile] = useState<AppProfile>(defaultProfile);
+
+  // Hydrate from cookie first (captures fresh login), then fall back to localStorage
+  useEffect(() => {
+    const savedLang = window.localStorage.getItem("qurani-language");
+    if (savedLang === "id" || savedLang === "en" || savedLang === "ar") {
+      setLanguageState(savedLang as AppLanguage);
+    }
+
+    // Cookie always wins → guarantees fresh profile after switching accounts
+    const cookieProfile = readUserCookie();
+    if (cookieProfile) {
+      setProfile(cookieProfile);
+      // Sync localStorage to the cookie data so future refreshes stay consistent
+      window.localStorage.setItem("qurani-profile", JSON.stringify(cookieProfile));
+      return;
+    }
+
+    const storedProfile = window.localStorage.getItem("qurani-profile");
+    if (storedProfile) {
+      try {
+        setProfile(normalizeProfile(JSON.parse(storedProfile)));
+        return;
+      } catch {
+        window.localStorage.removeItem("qurani-profile");
+      }
+    }
+  }, []);
 
   useEffect(() => {
-    window.localStorage.setItem(STORAGE_LANGUAGE_KEY, language);
+    window.localStorage.setItem("qurani-language", language);
     document.documentElement.lang = language;
   }, [language]);
 
   useEffect(() => {
-    window.localStorage.setItem(STORAGE_PROFILE_KEY, JSON.stringify(profile));
+    window.localStorage.setItem("qurani-profile", JSON.stringify(profile));
   }, [profile]);
 
   const setLanguage = useCallback((value: AppLanguage) => {

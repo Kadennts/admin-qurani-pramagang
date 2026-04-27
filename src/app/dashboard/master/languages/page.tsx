@@ -1,33 +1,48 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Plus, Search, Filter, Pencil, Trash2, ChevronLeft, ChevronRight, X, Loader2 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
+
+const PAGE_SIZE = 10;
 
 export default function LanguagesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
   const [languages, setLanguages] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
 
   const supabase = createClient();
 
-  useEffect(() => {
-    async function fetchLanguages() {
-      setIsLoading(true);
-      const { data, error } = await supabase
-        .from('languages')
-        .select('*')
-        .order('id', { ascending: true });
-      
-      if (data) {
-        setLanguages(data);
-      }
-      setIsLoading(false);
-    }
+  const fetchLanguages = useCallback(async () => {
+    setIsLoading(true);
+    const { data } = await supabase
+      .from('languages')
+      .select('*')
+      .order('id', { ascending: true });
     
+    if (data) {
+      setLanguages(data);
+    }
+    setIsLoading(false);
+  }, []);
+
+  useEffect(() => {
     fetchLanguages();
-  }, [supabase]);
+  }, [fetchLanguages]);
+
+  const filtered = languages.filter((lang) =>
+    lang.name.toLowerCase().includes(search.toLowerCase()) ||
+    lang.code.toLowerCase().includes(search.toLowerCase()) ||
+    (lang.native_name ?? "").toLowerCase().includes(search.toLowerCase())
+  );
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  const handleSearch = (v: string) => { setSearch(v); setCurrentPage(1); };
 
   const openCreateModal = () => {
     setModalMode('create');
@@ -37,6 +52,13 @@ export default function LanguagesPage() {
   const openEditModal = () => {
     setModalMode('edit');
     setIsModalOpen(true);
+  };
+
+  const pageNumbers = () => {
+    if (totalPages <= 5) return Array.from({ length: totalPages }, (_, i) => i + 1);
+    if (currentPage <= 3) return [1, 2, 3, 4, 5];
+    if (currentPage >= totalPages - 2) return [totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    return [currentPage - 2, currentPage - 1, currentPage, currentPage + 1, currentPage + 2];
   };
 
   return (
@@ -56,7 +78,9 @@ export default function LanguagesPage() {
           <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input 
             type="text" 
-            placeholder="Search by name, code, or language family..." 
+            placeholder="Search by name, code, or native name..." 
+            value={search}
+            onChange={(e) => handleSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#059669]/20 focus:border-[#059669]"
           />
         </div>
@@ -72,7 +96,8 @@ export default function LanguagesPage() {
           <table className="w-full whitespace-nowrap">
             <thead>
               <tr className="bg-[#059669] text-white text-sm font-bold text-left">
-                <th className="px-6 py-4 rounded-tl-xl">Name</th>
+                <th className="px-6 py-4 rounded-tl-xl">ID</th>
+                <th className="px-6 py-4">Name</th>
                 <th className="px-6 py-4">Native Name</th>
                 <th className="px-6 py-4">Code</th>
                 <th className="px-6 py-4">Direction</th>
@@ -83,20 +108,21 @@ export default function LanguagesPage() {
             <tbody className="divide-y divide-slate-100 text-sm">
               {isLoading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
+                  <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
                     <Loader2 className="animate-spin mx-auto mb-2 text-emerald-600" size={24} />
                     Loading languages from Supabase...
                   </td>
                 </tr>
-              ) : languages.length === 0 ? (
+              ) : paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500 font-medium">
-                    No languages found.
+                  <td colSpan={7} className="px-6 py-12 text-center text-slate-500 font-medium">
+                    Tidak ada data ditemukan.
                   </td>
                 </tr>
               ) : (
-                languages.map((lang) => (
+                paginated.map((lang, i) => (
                   <tr key={lang.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-6 py-4 text-slate-500 font-medium">#{(currentPage - 1) * PAGE_SIZE + i + 1}</td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 font-bold flex items-center justify-center text-xs shrink-0 uppercase">
@@ -136,19 +162,38 @@ export default function LanguagesPage() {
           </table>
         </div>
 
-        {/* Pagination mock */}
-        <div className="p-4 border-t border-slate-100 flex items-center justify-center gap-2 text-sm font-medium">
-          <button className="text-slate-400 flex items-center gap-1 hover:text-slate-600 px-2 cursor-not-allowed">
-            <ChevronLeft size={16} /> Previous
-          </button>
-          <button className="w-8 h-8 rounded bg-[#059669] text-white flex items-center justify-center">1</button>
-          <button className="w-8 h-8 rounded text-slate-600 hover:bg-slate-100 flex items-center justify-center">2</button>
-          <button className="w-8 h-8 rounded text-slate-600 hover:bg-slate-100 flex items-center justify-center">3</button>
-          <button className="w-8 h-8 rounded text-slate-600 hover:bg-slate-100 flex items-center justify-center">4</button>
-          <button className="w-8 h-8 rounded text-slate-600 hover:bg-slate-100 flex items-center justify-center">5</button>
-          <button className="text-slate-600 flex items-center gap-1 hover:text-slate-900 px-2">
-            Next <ChevronRight size={16} />
-          </button>
+        {/* Pagination Footer */}
+        <div className="border-t border-slate-100 px-6 py-4 flex items-center justify-between bg-white">
+          <span className="text-sm font-bold text-slate-400">
+            Menampilkan <span className="text-emerald-600 font-extrabold">{filtered.length === 0 ? 0 : Math.min((currentPage - 1) * PAGE_SIZE + 1, filtered.length)}–{Math.min(currentPage * PAGE_SIZE, filtered.length)}</span> dari {filtered.length} languages
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="h-9 w-9 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            {pageNumbers().map((n) => (
+              <button
+                key={n}
+                onClick={() => setCurrentPage(n)}
+                className={`h-9 w-9 flex items-center justify-center rounded-lg text-sm font-bold transition-colors ${
+                  n === currentPage ? "bg-[#059669] text-white" : "border border-slate-200 text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                {n}
+              </button>
+            ))}
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="h-9 w-9 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
         </div>
       </div>
 

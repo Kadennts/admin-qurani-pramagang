@@ -14,32 +14,67 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const { t } = useAppPreferences();
 
-  const handleLogin = (event: FormEvent) => {
+  const handleLogin = async (event: FormEvent) => {
     event.preventDefault();
 
-    if (username === "admin" && password === "admin123") {
-      setError("");
-      setIsLoading(true);
+    setIsLoading(true);
 
-      document.cookie =
-        "myqurani_access_token=dummy_token_admin; path=/; max-age=86400;";
-      document.cookie =
-        "myqurani_user=" +
-        JSON.stringify({
-          id: 1,
-          name: "Admin Qurani",
-          username: "admin",
-          email: "admin@qurani.com",
-          role: "admin",
-        }) +
-        "; path=/; max-age=86400;";
+    try {
+      const { createClient } = await import("@/utils/supabase/client");
+      const supabase = createClient();
+      
+      const { data: dbUser } = await supabase
+        .from('admin_users')
+        .select('*')
+        .eq('username', username)
+        .eq('password', password)
+        .single();
+        
+      let userToLogin = null;
 
-      window.setTimeout(() => {
-        window.location.href = "/dashboard";
-      }, 1200);
-      return;
+      if (dbUser) {
+        userToLogin = dbUser;
+      } else {
+        // Fallback akun statis sebagai percontohan awal (jika tabel admin_users belum dibuat di Supabase)
+        const mockAccounts: Record<string, any> = {
+          'amin_malang': { id: 1, name: 'Amin Malang', username: 'amin_malang', email: 'amin@malang.id', role: 'admin', bio: 'Admin Regional WIB', country: 'Indonesia', state: 'Jawa Timur', city: 'Malang', timezone: 'Asia/Jakarta' },
+          'budi_makassar': { id: 2, name: 'Budi Makassar', username: 'budi_makassar', email: 'budi@wita.id', role: 'admin', bio: 'Admin Regional WITA', country: 'Indonesia', state: 'Sulawesi Selatan', city: 'Makassar', timezone: 'Asia/Makassar' },
+          'citra_jayapura': { id: 3, name: 'Citra Jayapura', username: 'citra_jayapura', email: 'citra@wit.id', role: 'admin', bio: 'Admin Regional WIT', country: 'Indonesia', state: 'Papua', city: 'Jayapura', timezone: 'Asia/Jayapura' },
+          'dedi_london': { id: 4, name: 'Dedi London', username: 'dedi_london', email: 'dedi@london.uk', role: 'admin', bio: 'Admin Regional Luar Negeri', country: 'United Kingdom', state: 'England', city: 'London', timezone: 'Europe/London' }
+        };
+
+        if (mockAccounts[username] && password === 'password123') {
+          userToLogin = mockAccounts[username];
+          // Otomatis menanamkan (seed) data sampel ini ke Supabase jika memungkinkan
+          await supabase.from('admin_users').upsert({
+            ...userToLogin,
+            password: 'password123'
+          }, { onConflict: 'username' });
+        } else if (username === 'admin' && password === 'admin123') {
+          userToLogin = { id: 99, name: 'Admin Qurani', username: 'admin', email: 'admin@qurani.com', role: 'admin', country: 'Indonesia', state: 'Jawa Timur', city: 'Malang', timezone: 'Asia/Jakarta' };
+        }
+      }
+
+      if (userToLogin) {
+        setError("");
+        document.cookie = `myqurani_access_token=dummy_token_${userToLogin.username}; path=/; max-age=86400;`;
+        document.cookie = `myqurani_user=${encodeURIComponent(JSON.stringify(userToLogin))}; path=/; max-age=86400;`;
+        
+        // Hapus cache profil akun lama, lalu tulis profil akun baru.
+        // Provider akan membaca cookie → qurani-profile saat mount berikutnya.
+        window.localStorage.removeItem('qurani-profile');
+        window.localStorage.setItem('qurani-profile', JSON.stringify(userToLogin));
+
+        window.setTimeout(() => {
+          window.location.href = "/dashboard";
+        }, 800);
+        return;
+      }
+    } catch (err) {
+      console.error(err);
     }
-
+    
+    setIsLoading(false);
     setError("Username atau password salah.");
   };
 

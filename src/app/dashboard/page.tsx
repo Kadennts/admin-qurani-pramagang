@@ -216,6 +216,7 @@ export default function DashboardPage() {
   const [referenceDate] = useState(() => new Date());
   const [periodOptions] = useState(() => buildPeriodOptions(referenceDate));
   const [selectedPeriodId, setSelectedPeriodId] = useState("this-month");
+  const [isOptionsOpen, setIsOptionsOpen] = useState(false);
 
   const [counts, setCounts] = useState<Counts>({
     recitations: 0,
@@ -334,29 +335,41 @@ export default function DashboardPage() {
         <div className="relative">
           <button
             type="button"
+            onClick={() => setIsOptionsOpen((prev) => !prev)}
             className="flex min-w-[220px] items-center justify-between gap-3 rounded-xl border border-[#059669]/20 bg-emerald-50 px-4 py-2.5 text-[#059669] shadow-sm transition-colors hover:bg-emerald-100"
           >
             <span className="flex items-center gap-2">
               <Calendar size={16} />
               <span className="text-sm font-extrabold">Periode: {selectedPeriod.label}</span>
             </span>
-            <ChevronDown size={16} />
+            <ChevronDown size={16} className={`transition-transform duration-200 ${isOptionsOpen ? 'rotate-180' : ''}`} />
           </button>
 
-          <div className="pointer-events-none absolute inset-0">
-            <select
-              aria-label="Pilih periode dashboard"
-              value={selectedPeriodId}
-              onChange={(event) => setSelectedPeriodId(event.target.value)}
-              className="pointer-events-auto absolute inset-0 cursor-pointer opacity-0"
-            >
-              {periodOptions.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
+          {isOptionsOpen && (
+            <>
+              {/* Backstop to close */}
+              <div 
+                className="fixed inset-0 z-40" 
+                onClick={() => setIsOptionsOpen(false)}
+              ></div>
+              <div className="absolute right-0 top-full z-50 mt-2 max-h-60 w-full overflow-auto rounded-xl border border-slate-100 bg-white py-1 shadow-xl custom-scrollbar dark:border-slate-800 dark:bg-slate-900">
+                {periodOptions.map((option) => (
+                  <button
+                    key={option.id}
+                    className={`block w-full px-4 py-2 text-left text-sm transition-colors hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-slate-800 dark:hover:text-emerald-400 ${
+                      selectedPeriodId === option.id ? 'bg-emerald-50 font-bold text-emerald-700 dark:bg-slate-800' : 'text-slate-700 dark:text-slate-300'
+                    }`}
+                    onClick={() => {
+                      setSelectedPeriodId(option.id);
+                      setIsOptionsOpen(false);
+                    }}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
 

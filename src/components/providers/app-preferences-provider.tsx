@@ -23,6 +23,13 @@ export type AppProfile = {
   state: string;
   city: string;
   timezone: string;
+  // Field baru untuk Edit Profile
+  fullName: string;
+  nickname: string;
+  phone: string;
+  gender: string;
+  job: string;
+  dateOfBirth: string;
 };
 
 type TranslationKey =
@@ -436,16 +443,23 @@ const translations: Record<AppLanguage, Record<TranslationKey, string>> = {
 };
 
 const defaultProfile: AppProfile = {
-  name: "Admin",
+  name: "Admin Utama",
   username: "admin",
-  email: "superadmin@gmail.com",
+  email: "admin@qurani.com",
   role: "Admin",
   bio: "Admin",
   avatar: "",
   country: "Indonesia",
   state: "Jawa Timur",
   city: "Malang",
-  timezone: "Asia/Jakarta"
+  timezone: "Asia/Jakarta",
+  // Data Admin Utama
+  fullName: "Admin Utama",
+  nickname: "Admin",
+  phone: "+62 812 3456 7890",
+  gender: "Male",
+  job: "System Administrator",
+  dateOfBirth: "1990-01-01",
 };
 
 const PreferencesContext = createContext<PreferencesContextValue | null>(null);
@@ -473,6 +487,13 @@ function normalizeProfile(value: Partial<AppProfile> | null | undefined): AppPro
     state: value?.state || defaultProfile.state,
     city: value?.city || defaultProfile.city,
     timezone: value?.timezone || defaultProfile.timezone,
+    // Field baru — gunakan nilai dari value jika ada, fallback ke default
+    fullName: value?.fullName?.trim() || value?.name?.trim() || defaultProfile.fullName,
+    nickname: value?.nickname?.trim() || defaultProfile.nickname,
+    phone: value?.phone?.trim() || defaultProfile.phone,
+    gender: value?.gender?.trim() || defaultProfile.gender,
+    job: value?.job?.trim() || defaultProfile.job,
+    dateOfBirth: value?.dateOfBirth?.trim() || defaultProfile.dateOfBirth,
   };
 }
 
@@ -509,33 +530,25 @@ function readUserCookie() {
   }
 }
 
-function getInitialLanguage(): AppLanguage {
-  if (typeof window === "undefined") {
-    return "en";
+function mergeStoredProfileWithCookieProfile(
+  cookieProfile: AppProfile | null,
+  storedProfile: AppProfile | null,
+) {
+  if (!cookieProfile) {
+    return storedProfile;
   }
 
-  const saved = window.localStorage.getItem(STORAGE_LANGUAGE_KEY);
-  if (saved === "id" || saved === "ar" || saved === "en") {
-    return saved as AppLanguage;
-  }
-  return "en";
-}
-
-function getInitialProfile(): AppProfile {
-  if (typeof window === "undefined") {
-    return defaultProfile;
+  if (!storedProfile || storedProfile.username !== cookieProfile.username) {
+    return cookieProfile;
   }
 
-  const storedProfile = window.localStorage.getItem(STORAGE_PROFILE_KEY);
-  if (storedProfile) {
-    try {
-      return normalizeProfile(JSON.parse(storedProfile));
-    } catch {
-      window.localStorage.removeItem(STORAGE_PROFILE_KEY);
-    }
-  }
-
-  return readUserCookie() ?? defaultProfile;
+  // Only borrow client-only fields from the same account. This avoids
+  // showing the previous user's avatar/bio after switching accounts.
+  return normalizeProfile({
+    ...cookieProfile,
+    avatar: storedProfile.avatar || "",
+    bio: storedProfile.bio || cookieProfile.bio,
+  });
 }
 
 export function AppPreferencesProvider({
@@ -550,38 +563,43 @@ export function AppPreferencesProvider({
 
   // Hydrate from cookie first (captures fresh login), then fall back to localStorage
   useEffect(() => {
-    const savedLang = window.localStorage.getItem("qurani-language");
+    const savedLang = window.localStorage.getItem(STORAGE_LANGUAGE_KEY);
     if (savedLang === "id" || savedLang === "en" || savedLang === "ar") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLanguageState(savedLang as AppLanguage);
     }
 
     // Cookie always wins → guarantees fresh profile after switching accounts
     const cookieProfile = readUserCookie();
-    if (cookieProfile) {
-      setProfile(cookieProfile);
-      // Sync localStorage to the cookie data so future refreshes stay consistent
-      window.localStorage.setItem("qurani-profile", JSON.stringify(cookieProfile));
-      return;
-    }
+    let storedProfile: AppProfile | null = null;
+    const rawStoredProfile = window.localStorage.getItem(STORAGE_PROFILE_KEY);
 
-    const storedProfile = window.localStorage.getItem("qurani-profile");
-    if (storedProfile) {
+    if (rawStoredProfile) {
       try {
-        setProfile(normalizeProfile(JSON.parse(storedProfile)));
-        return;
+        storedProfile = normalizeProfile(JSON.parse(rawStoredProfile));
       } catch {
         window.localStorage.removeItem("qurani-profile");
       }
     }
+
+    const hydratedProfile = mergeStoredProfileWithCookieProfile(
+      cookieProfile,
+      storedProfile,
+    );
+
+    if (hydratedProfile) {
+      setProfile(hydratedProfile);
+      window.localStorage.setItem(STORAGE_PROFILE_KEY, JSON.stringify(hydratedProfile));
+    }
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem("qurani-language", language);
+    window.localStorage.setItem(STORAGE_LANGUAGE_KEY, language);
     document.documentElement.lang = language;
   }, [language]);
 
   useEffect(() => {
-    window.localStorage.setItem("qurani-profile", JSON.stringify(profile));
+    window.localStorage.setItem(STORAGE_PROFILE_KEY, JSON.stringify(profile));
   }, [profile]);
 
   const setLanguage = useCallback((value: AppLanguage) => {

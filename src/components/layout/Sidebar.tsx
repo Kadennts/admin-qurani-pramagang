@@ -1,8 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import type { ComponentType } from "react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   Banknote,
@@ -36,6 +37,7 @@ import {
 
 import { QuraniLogo } from "@/components/branding/qurani-logo";
 import { useAppPreferences } from "@/components/providers/app-preferences-provider";
+import { clearCurrentSessionProfileStorage } from "@/features/profile/account/model/profile-account.utils";
 
 type MenuKey = "support" | "billing" | "admin" | "master" | null;
 
@@ -51,48 +53,8 @@ export function Sidebar() {
   const [openMenu, setOpenMenu] = useState<MenuKey>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
-
-  // Safe translation: use English on server, real translation after mount
-  const st = isMounted ? t : (_key: any) => {
-    // Return a basic English fallback for SSR to match server output
-    const fallbacks: Record<string, string> = {
-      "sidebar.support": "Support",
-      "sidebar.billing": "Billing",
-      "sidebar.administrator": "Administrator",
-      "sidebar.masterData": "Master Data",
-      "sidebar.dashboard": "Dashboard",
-      "sidebar.supportTickets": "Support Tickets",
-      "sidebar.groups": "Groups",
-      "sidebar.recitation": "Recitation",
-      "sidebar.kycMember": "KYC Member",
-      "sidebar.kycOrganization": "KYC Organization",
-      "sidebar.orders": "Orders",
-      "sidebar.promo": "Promo & Coupon",
-      "sidebar.wallet": "Wallet",
-      "sidebar.users": "Users",
-      "sidebar.countries": "Countries",
-      "sidebar.states": "States",
-      "sidebar.cities": "Cities",
-      "sidebar.currencies": "Currencies",
-      "sidebar.languages": "Languages",
-      "sidebar.taxRates": "Tax Rates",
-      "sidebar.teacher": "Teacher",
-      "sidebar.package": "Package",
-      "sidebar.payout": "Payout",
-      "sidebar.notifications": "Notifications",
-      "sidebar.settings": "Settings",
-      "sidebar.profile": "Profile",
-      "sidebar.logout": "Logout",
-      "sidebar.closeSidebar": "Close sidebar",
-      "sidebar.expandSidebar": "Expand sidebar",
-    };
-    return fallbacks[_key] ?? _key;
-  };
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+  const isMounted = true;
+  const st = t;
 
   const avatarSrc = profile.avatar || "/img/profile admin.jpg";
 
@@ -109,7 +71,10 @@ export function Sidebar() {
   const activeOpenMenu = isCollapsed ? openMenu : openMenu ?? derivedOpenMenu;
 
   const getSubLinkClass = (path: string) => {
-    const isActive = pathname === path || pathname.startsWith(`${path}/`);
+    const isSectionMain = ["/dashboard/support", "/dashboard/billing", "/dashboard/admin", "/dashboard/master"].includes(path);
+    const isActive = isSectionMain 
+      ? pathname === path 
+      : pathname === path || pathname.startsWith(`${path}/`);
 
     return [
       "flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-all",
@@ -180,6 +145,7 @@ export function Sidebar() {
   const handleLogout = () => {
     document.cookie = "myqurani_access_token=; path=/; max-age=0";
     document.cookie = "myqurani_user=; path=/; max-age=0";
+    clearCurrentSessionProfileStorage();
     window.location.href = "/login";
   };
 
@@ -257,17 +223,19 @@ export function Sidebar() {
           />
         </button>
 
-        <div className={`overflow-hidden transition-all duration-300 ${isOpen ? "mt-1 max-h-[520px]" : "max-h-0"}`}>
-          <div className="ml-3 space-y-1 border-l border-slate-200 py-1 pl-4 dark:border-slate-800">
-            {links.map((link) => {
-              const LinkIcon = link.icon;
-              return (
-                <Link key={link.href} href={link.href} className={getSubLinkClass(link.href)}>
-                  <LinkIcon size={16} />
-                  <span>{link.label}</span>
-                </Link>
-              );
-            })}
+        <div className={`grid transition-all duration-300 ease-in-out ${isOpen ? "grid-rows-[1fr] opacity-100 mt-1" : "grid-rows-[0fr] opacity-0"}`}>
+          <div className="overflow-hidden">
+            <div className="ml-3 space-y-1 border-l border-slate-200 py-1 pl-4 dark:border-slate-800">
+              {links.map((link) => {
+                const LinkIcon = link.icon;
+                return (
+                  <Link key={link.href} href={link.href} className={getSubLinkClass(link.href)}>
+                    <LinkIcon size={16} />
+                    <span>{link.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
@@ -462,10 +430,13 @@ export function Sidebar() {
               </>
             ) : (
               <>
-                <img
+                <Image
                   src={avatarSrc}
                   alt={profile.name}
+                  width={44}
+                  height={44}
                   className={`${isCollapsed ? "h-9 w-9" : "h-11 w-11"} rounded-full border border-slate-200 object-cover shadow-sm dark:border-slate-700`}
+                  unoptimized={avatarSrc.startsWith("data:")}
                 />
                 {!isCollapsed ? (
                   <>

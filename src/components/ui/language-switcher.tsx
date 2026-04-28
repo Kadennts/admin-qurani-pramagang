@@ -11,22 +11,25 @@ type LanguageSwitcherProps = {
   className?: string;
 };
 
+// Daftar bahasa yang tersedia beserta path gambar bendera di public/img/flags/
 const LANGUAGE_OPTIONS: Array<{
   value: AppLanguage;
-  flag: string;
-  badgeClassName: string;
+  flagSrc: string; // path gambar bendera dari folder public
 }> = [
-  { value: "id", flag: "ID", badgeClassName: "bg-red-600 text-white" },
-  { value: "en", flag: "US", badgeClassName: "bg-blue-600 text-white" },
-  { value: "ar", flag: "SA", badgeClassName: "bg-emerald-700 text-white" },
+  { value: "id", flagSrc: "/img/flags/id.jpg" },
+  { value: "en", flagSrc: "/img/flags/en.jpg" },
+  { value: "ar", flagSrc: "/img/flags/ar.jpg" },
 ];
 
-function getFlagEmoji(code: string) {
-  return code
-    .toUpperCase()
-    .split("")
-    .map((char) => String.fromCodePoint(127397 + char.charCodeAt(0)))
-    .join("");
+/** Komponen bendera — gambar dari folder public/img/flags/ */
+function FlagImage({ src, alt }: { src: string; alt: string }) {
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className="h-7 w-7 rounded-full object-cover shadow-sm ring-1 ring-slate-200 dark:ring-slate-700"
+    />
+  );
 }
 
 export function LanguageSwitcher({
@@ -49,6 +52,7 @@ export function LanguageSwitcher({
     return () => document.removeEventListener("mousedown", handleOutsideClick);
   }, []);
 
+  // Label teks setiap bahasa berdasarkan translasi aktif
   const labels: Record<AppLanguage, string> = {
     en: t("common.english"),
     id: t("common.indonesian"),
@@ -60,17 +64,15 @@ export function LanguageSwitcher({
 
   return (
     <div ref={containerRef} className={`relative ${className}`}>
+      {/* Tombol pemilih bahasa aktif */}
       <button
         type="button"
         onClick={() => setIsOpen((open) => !open)}
         className="flex min-w-[152px] items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
       >
         <span className="flex items-center gap-3">
-          <span
-            className={`flex h-7 w-7 items-center justify-center rounded-full text-[15px] shadow-sm ${activeOption.badgeClassName}`}
-          >
-            {getFlagEmoji(activeOption.flag)}
-          </span>
+          {/* Gambar bendera bahasa aktif */}
+          <FlagImage src={activeOption.flagSrc} alt={labels[activeOption.value]} />
           <span>{labels[activeOption.value]}</span>
         </span>
         <ChevronDown
@@ -79,6 +81,7 @@ export function LanguageSwitcher({
         />
       </button>
 
+      {/* Dropdown daftar bahasa */}
       {isOpen ? (
         <div className="absolute right-0 z-50 mt-2 w-full min-w-[180px] overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-[0_20px_45px_rgba(15,23,42,0.16)] dark:border-slate-700 dark:bg-slate-900">
           {LANGUAGE_OPTIONS.map((option) => {
@@ -99,11 +102,8 @@ export function LanguageSwitcher({
                 }`}
               >
                 <span className="flex items-center gap-3">
-                  <span
-                    className={`flex h-7 w-7 items-center justify-center rounded-full text-[15px] shadow-sm ${option.badgeClassName}`}
-                  >
-                    {getFlagEmoji(option.flag)}
-                  </span>
+                  {/* Gambar bendera setiap opsi */}
+                  <FlagImage src={option.flagSrc} alt={labels[option.value]} />
                   <span>{labels[option.value]}</span>
                 </span>
                 {isActive ? <Check size={16} className="text-slate-500 dark:text-slate-300" /> : null}

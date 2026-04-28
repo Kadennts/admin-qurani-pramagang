@@ -5,7 +5,47 @@ import { LogIn, Loader2 } from "lucide-react";
 import { type FormEvent, useState } from "react";
 
 import { QuraniLogo } from "@/components/branding/qurani-logo";
-import { useAppPreferences } from "@/components/providers/app-preferences-provider";
+import {
+  useAppPreferences,
+  type AppProfile,
+} from "@/components/providers/app-preferences-provider";
+import { fetchProfileAccountByUsername } from "@/features/profile/account/data/profile-account.repository";
+import {
+  mergeProfileAccountSources,
+  readScopedProfileAccountStorage,
+  syncProfileAccountSession,
+} from "@/features/profile/account/model/profile-account.utils";
+
+function buildBaseProfile(value: {
+  name?: string;
+  username?: string;
+  email?: string;
+  role?: string;
+  bio?: string;
+  avatar?: string;
+  country?: string;
+  state?: string;
+  province?: string;
+  city?: string;
+  timezone?: string;
+}): AppProfile {
+  const role = value.role
+    ? `${value.role.slice(0, 1).toUpperCase()}${value.role.slice(1)}`
+    : "Admin";
+
+  return {
+    name: value.name || "Admin Qurani",
+    username: value.username || "admin",
+    email: value.email || "admin@qurani.com",
+    role,
+    bio: value.bio || role,
+    avatar: value.avatar || "",
+    country: value.country || "Indonesia",
+    state: value.state || value.province || "Jawa Timur",
+    city: value.city || "Malang",
+    timezone: value.timezone || "Asia/Jakarta",
+  };
+}
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -22,48 +62,109 @@ export default function LoginPage() {
     try {
       const { createClient } = await import("@/utils/supabase/client");
       const supabase = createClient();
-      
+
       const { data: dbUser } = await supabase
-        .from('admin_users')
-        .select('*')
-        .eq('username', username)
-        .eq('password', password)
+        .from("admin_users")
+        .select("*")
+        .eq("username", username)
+        .eq("password", password)
         .single();
-        
-      let userToLogin = null;
+
+      let userToLogin: AppProfile | null = null;
 
       if (dbUser) {
-        userToLogin = dbUser;
+        userToLogin = buildBaseProfile(dbUser);
       } else {
-        // Fallback akun statis sebagai percontohan awal (jika tabel admin_users belum dibuat di Supabase)
-        const mockAccounts: Record<string, any> = {
-          'amin_malang': { id: 1, name: 'Amin Malang', username: 'amin_malang', email: 'amin@malang.id', role: 'admin', bio: 'Admin Regional WIB', country: 'Indonesia', state: 'Jawa Timur', city: 'Malang', timezone: 'Asia/Jakarta' },
-          'budi_makassar': { id: 2, name: 'Budi Makassar', username: 'budi_makassar', email: 'budi@wita.id', role: 'admin', bio: 'Admin Regional WITA', country: 'Indonesia', state: 'Sulawesi Selatan', city: 'Makassar', timezone: 'Asia/Makassar' },
-          'citra_jayapura': { id: 3, name: 'Citra Jayapura', username: 'citra_jayapura', email: 'citra@wit.id', role: 'admin', bio: 'Admin Regional WIT', country: 'Indonesia', state: 'Papua', city: 'Jayapura', timezone: 'Asia/Jayapura' },
-          'dedi_london': { id: 4, name: 'Dedi London', username: 'dedi_london', email: 'dedi@london.uk', role: 'admin', bio: 'Admin Regional Luar Negeri', country: 'United Kingdom', state: 'England', city: 'London', timezone: 'Europe/London' }
+        const mockAccounts: Record<string, AppProfile> = {
+          amin_malang: buildBaseProfile({
+            name: "Amin Malang",
+            username: "amin_malang",
+            email: "amin@malang.id",
+            role: "admin",
+            bio: "Admin Regional WIB",
+            country: "Indonesia",
+            state: "Jawa Timur",
+            city: "Malang",
+            timezone: "Asia/Jakarta",
+          }),
+          budi_makassar: buildBaseProfile({
+            name: "Budi Makassar",
+            username: "budi_makassar",
+            email: "budi@wita.id",
+            role: "admin",
+            bio: "Admin Regional WITA",
+            country: "Indonesia",
+            state: "Sulawesi Selatan",
+            city: "Makassar",
+            timezone: "Asia/Makassar",
+          }),
+          citra_jayapura: buildBaseProfile({
+            name: "Citra Jayapura",
+            username: "citra_jayapura",
+            email: "citra@wit.id",
+            role: "admin",
+            bio: "Admin Regional WIT",
+            country: "Indonesia",
+            state: "Papua",
+            city: "Jayapura",
+            timezone: "Asia/Jayapura",
+          }),
+          dedi_london: buildBaseProfile({
+            name: "Dedi London",
+            username: "dedi_london",
+            email: "dedi@london.uk",
+            role: "admin",
+            bio: "Admin Regional Luar Negeri",
+            country: "United Kingdom",
+            state: "England",
+            city: "London",
+            timezone: "Europe/London",
+          }),
         };
 
-        if (mockAccounts[username] && password === 'password123') {
+        if (mockAccounts[username] && password === "password123") {
           userToLogin = mockAccounts[username];
-          // Otomatis menanamkan (seed) data sampel ini ke Supabase jika memungkinkan
-          await supabase.from('admin_users').upsert({
-            ...userToLogin,
-            password: 'password123'
-          }, { onConflict: 'username' });
-        } else if (username === 'admin' && password === 'admin123') {
-          userToLogin = { id: 99, name: 'Admin Qurani', username: 'admin', email: 'admin@qurani.com', role: 'admin', country: 'Indonesia', state: 'Jawa Timur', city: 'Malang', timezone: 'Asia/Jakarta' };
+
+          await supabase.from("admin_users").upsert(
+            {
+              ...userToLogin,
+              password: "password123",
+            },
+            { onConflict: "username" },
+          );
+        } else if (username === "admin" && password === "admin123") {
+          userToLogin = buildBaseProfile({
+            name: "Admin Qurani",
+            username: "admin",
+            email: "admin@qurani.com",
+            role: "admin",
+            country: "Indonesia",
+            state: "Jawa Timur",
+            city: "Malang",
+            timezone: "Asia/Jakarta",
+          });
         }
       }
 
       if (userToLogin) {
+        const persistedProfile = await fetchProfileAccountByUsername(
+          supabase,
+          userToLogin.username,
+        ).catch(() => null);
+        const scopedProfile = readScopedProfileAccountStorage(
+          userToLogin.username,
+        );
+        // Login data gives us the account identity, then we layer in the
+        // persisted profile and the latest browser draft for that same user.
+        const mergedProfile = mergeProfileAccountSources(
+          userToLogin,
+          persistedProfile,
+          scopedProfile,
+        );
+
         setError("");
-        document.cookie = `myqurani_access_token=dummy_token_${userToLogin.username}; path=/; max-age=86400;`;
-        document.cookie = `myqurani_user=${encodeURIComponent(JSON.stringify(userToLogin))}; path=/; max-age=86400;`;
-        
-        // Hapus cache profil akun lama, lalu tulis profil akun baru.
-        // Provider akan membaca cookie → qurani-profile saat mount berikutnya.
-        window.localStorage.removeItem('qurani-profile');
-        window.localStorage.setItem('qurani-profile', JSON.stringify(userToLogin));
+        document.cookie = `myqurani_access_token=dummy_token_${mergedProfile.username}; path=/; max-age=86400;`;
+        syncProfileAccountSession(mergedProfile);
 
         window.setTimeout(() => {
           window.location.href = "/dashboard";
@@ -73,7 +174,7 @@ export default function LoginPage() {
     } catch (err) {
       console.error(err);
     }
-    
+
     setIsLoading(false);
     setError("Username atau password salah.");
   };
@@ -184,7 +285,9 @@ export default function LoginPage() {
         </form>
 
         <div className="mt-8 text-center text-sm">
-          <span className="text-slate-500 dark:text-slate-400">{t("auth.noAccount")} </span>
+          <span className="text-slate-500 dark:text-slate-400">
+            {t("auth.noAccount")}{" "}
+          </span>
           <Link
             href="/register"
             className="font-semibold text-slate-700 underline underline-offset-2 hover:text-emerald-600 dark:text-slate-200 dark:hover:text-emerald-300"

@@ -104,7 +104,11 @@ export function filterSupportTickets(
     });
   }
 
-  return filtered;
+  return filtered.sort((a, b) => {
+    const timeA = new Date(a.last_reply_at || a.created_at || 0).getTime();
+    const timeB = new Date(b.last_reply_at || b.created_at || 0).getTime();
+    return timeB - timeA;
+  });
 }
 
 export function formatTicketDateTime(dateStr: string | null, locale = "en-US", timezone = "Asia/Jakarta") {

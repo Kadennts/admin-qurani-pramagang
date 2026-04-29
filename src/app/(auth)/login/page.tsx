@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { LogIn, Loader2 } from "lucide-react";
 import { type FormEvent, useState } from "react";
-
 import { QuraniLogo } from "@/components/branding/qurani-logo";
 import {
   useAppPreferences,
@@ -28,6 +27,13 @@ function buildBaseProfile(value: {
   province?: string;
   city?: string;
   timezone?: string;
+  // tambah ini di parameter juga
+  fullName?: string;
+  nickname?: string;
+  phone?: string;
+  gender?: string;
+  job?: string;
+  dateOfBirth?: string;
 }): AppProfile {
   const role = value.role
     ? `${value.role.slice(0, 1).toUpperCase()}${value.role.slice(1)}`
@@ -44,6 +50,13 @@ function buildBaseProfile(value: {
     state: value.state || value.province || "Jawa Timur",
     city: value.city || "Malang",
     timezone: value.timezone || "Asia/Jakarta",
+    // tambah ini:
+    fullName: value.fullName || value.name || "Admin Qurani",
+    nickname: value.nickname || "",
+    phone: value.phone || "",
+    gender: value.gender || "",
+    job: value.job || role,
+    dateOfBirth: value.dateOfBirth || "",
   };
 }
 
